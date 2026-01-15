@@ -17,21 +17,25 @@ function formatDate(date: Date | string): string {
   });
 }
 
-// Format note with human-readable dates
+// Format note with human-readable dates (slug last)
 function formatNote(note: Note) {
+  const { slug, ...rest } = note;
   return {
-    ...note,
+    ...rest,
     createdAt: formatDate(note.createdAt),
     updatedAt: formatDate(note.updatedAt),
+    slug,
   };
 }
 
-// Format note metadata with human-readable dates
+// Format note metadata with human-readable dates (slug last)
 function formatNoteMeta(note: NoteMeta) {
+  const { slug, ...rest } = note;
   return {
-    ...note,
+    ...rest,
     createdAt: formatDate(note.createdAt),
     updatedAt: formatDate(note.updatedAt),
+    slug,
   };
 }
 
