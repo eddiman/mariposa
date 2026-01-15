@@ -76,6 +76,17 @@ The server exposes an MCP Streamable HTTP endpoint at `/mcp` with the following 
 | `create_category` | Create a new category |
 | `list_tags` | List all unique tags |
 
+### MCP Prompts
+
+The server also provides prompts that guide AI assistants in presenting information:
+
+| Prompt | Description |
+|--------|-------------|
+| `display_note` | Format a note for user-friendly display |
+| `summarize_notes` | Summarize all notes with statistics |
+| `create_note_helper` | Guide user through creating a new note |
+| `search_notes` | Search and present matching results |
+
 ### OpenWebUI Setup
 
 1. Go to **Admin Settings → External Tools**
