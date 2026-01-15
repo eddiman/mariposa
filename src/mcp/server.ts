@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { noteService } from '../services/noteService.js';
 import type { Note, NoteMeta } from '../types/note.js';
 
-// Format date to local timezone with readable format
+// Format date to local timezone with readable format (24h)
 function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleString('en-US', {
@@ -13,7 +13,7 @@ function formatDate(date: Date | string): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true,
+    hour12: false,
   });
 }
 
