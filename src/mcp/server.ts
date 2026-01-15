@@ -1,6 +1,44 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { noteService } from '../services/noteService.js';
+import type { Note, NoteMeta } from '../types/note.js';
+
+// Format date to local timezone with readable format
+function formatDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+// Format note with human-readable dates
+function formatNote(note: Note) {
+  return {
+    ...note,
+    createdAt: formatDate(note.createdAt),
+    updatedAt: formatDate(note.updatedAt),
+  };
+}
+
+// Format note metadata with human-readable dates
+function formatNoteMeta(note: NoteMeta) {
+  return {
+    ...note,
+    createdAt: formatDate(note.createdAt),
+    updatedAt: formatDate(note.updatedAt),
+  };
+}
+
+// Format multiple note metadata items
+function formatNotesMeta(notes: NoteMeta[]) {
+  return notes.map(formatNoteMeta);
+}
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -23,7 +61,7 @@ export function createMcpServer(): McpServer {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ notes, total: notes.length }, null, 2),
+            text: JSON.stringify({ notes: formatNotesMeta(notes), total: notes.length }, null, 2),
           },
         ],
       };
@@ -54,7 +92,7 @@ export function createMcpServer(): McpServer {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(note, null, 2),
+            text: JSON.stringify(formatNote(note), null, 2),
           },
         ],
       };
@@ -77,7 +115,7 @@ export function createMcpServer(): McpServer {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(note, null, 2),
+            text: JSON.stringify(formatNote(note), null, 2),
           },
         ],
       };
@@ -112,7 +150,7 @@ export function createMcpServer(): McpServer {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(note, null, 2),
+            text: JSON.stringify(formatNote(note), null, 2),
           },
         ],
       };
@@ -245,11 +283,7 @@ export function createMcpServer(): McpServer {
       }
 
       const tagsStr = note.tags.length > 0 ? note.tags.join(', ') : 'none';
-      const formattedDate = new Date(note.updatedAt).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
+      const formattedDate = formatDate(note.updatedAt);
 
       return {
         messages: [
