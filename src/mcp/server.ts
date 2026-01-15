@@ -53,7 +53,7 @@ export function createMcpServer(): McpServer {
   // Tool: list_notes
   server.tool(
     'list_notes',
-    'List all notes with optional filters by category, tags, or search query',
+    'List all notes with optional filters by category, tags, or search query. When displaying results, show columns in this order: Title, Category, Tags, Dates, then Slug last.',
     {
       category: z.string().optional().describe('Filter by category'),
       tags: z.string().optional().describe('Filter by tags (comma-separated)'),
