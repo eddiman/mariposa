@@ -170,27 +170,16 @@ function CanvasInner({
 
   // Handle paste from the hidden input - this captures native paste events on iOS
   const handlePasteTargetPaste = useCallback((e: React.ClipboardEvent) => {
-    // DEBUG: Alert to trace iOS paste flow
-    alert(`[handlePasteTargetPaste] Called! pendingPaste=${pendingPasteRef.current}, hasClipboardData=${!!e.clipboardData}, itemCount=${e.clipboardData?.items?.length || 0}`);
-    
     if (!pendingPasteRef.current) return;
     
     const items = e.clipboardData?.items;
-    if (!items) {
-      alert('[handlePasteTargetPaste] No items in clipboardData');
-      return;
-    }
-    
-    // DEBUG: Log item types
-    const itemTypes = Array.from(items).map(item => item.type).join(', ');
-    alert(`[handlePasteTargetPaste] Item types: ${itemTypes}`);
+    if (!items) return;
     
     // First, check for direct image data
     for (const item of Array.from(items)) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
         const file = item.getAsFile();
-        alert(`[handlePasteTargetPaste] Found image! type=${item.type}, file=${file ? `${file.name} (${file.size} bytes)` : 'null'}`);
         if (file) {
           const pastePosition = contextMenuPositionRef.current;
           onImagePaste(file, pastePosition);
@@ -205,7 +194,6 @@ function CanvasInner({
     // Check for text/uri-list (iOS often provides image URLs instead of blobs)
     const uriList = e.clipboardData?.getData('text/uri-list');
     if (uriList) {
-      alert(`[handlePasteTargetPaste] Found uri-list: ${uriList.substring(0, 100)}...`);
       const urls = uriList.split('\n').filter(url => url.trim() && !url.startsWith('#'));
       const imageUrl = urls.find(url => 
         /\.(jpg|jpeg|png|gif|webp|heic|heif)(\?|$)/i.test(url) ||
@@ -215,7 +203,6 @@ function CanvasInner({
       
       if (imageUrl) {
         e.preventDefault();
-        alert(`[handlePasteTargetPaste] Fetching image from URL: ${imageUrl.substring(0, 100)}...`);
         
         const pastePosition = contextMenuPositionRef.current;
         
@@ -226,13 +213,12 @@ function CanvasInner({
             return response.blob();
           })
           .then(blob => {
-            alert(`[handlePasteTargetPaste] Fetched blob: ${blob.size} bytes, type=${blob.type}`);
             const extension = blob.type.split('/')[1] || 'png';
             const file = new File([blob], `pasted-image.${extension}`, { type: blob.type || 'image/png' });
             onImagePaste(file, pastePosition);
           })
-          .catch(err => {
-            alert(`[handlePasteTargetPaste] Failed to fetch image: ${err.message}`);
+          .catch(() => {
+            // Failed to fetch image from URL
           });
         
         pendingPasteRef.current = false;
@@ -903,24 +889,16 @@ function CanvasInner({
     }
 
     event.preventDefault();
-    
-    // DEBUG: Check user activation and clipboard data
-    const userActivation = (navigator as Navigator & { userActivation?: { isActive: boolean; hasBeenActive: boolean } }).userActivation;
-    alert(`[handlePaste] Called! userActivation.isActive=${userActivation?.isActive}, hasClipboardData=${!!event.clipboardData}, itemCount=${event.clipboardData?.items?.length || 0}`);
 
     // IMPORTANT: Capture image file synchronously before any async operations
     // because clipboardData is only available during the event
     let imageFile: File | null = null;
     const items = event.clipboardData?.items;
     if (items) {
-      const itemTypes = Array.from(items).map(item => item.type).join(', ');
-      alert(`[handlePaste] Item types: ${itemTypes}`);
-      
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.type.startsWith('image/')) {
           imageFile = item.getAsFile();
-          alert(`[handlePaste] Found image! type=${item.type}, file=${imageFile ? `${imageFile.name} (${imageFile.size} bytes)` : 'null'}`);
           break;
         }
       }
@@ -1326,10 +1304,6 @@ function CanvasInner({
   // On iOS Safari, we use a hidden input to capture the native paste event
   // This works because the paste event provides clipboardData synchronously
   const handlePasteNodes = useCallback(() => {
-    // DEBUG: Check user activation status
-    const userActivation = (navigator as Navigator & { userActivation?: { isActive: boolean; hasBeenActive: boolean } }).userActivation;
-    alert(`[handlePasteNodes] Called! userActivation.isActive=${userActivation?.isActive}, userActivation.hasBeenActive=${userActivation?.hasBeenActive}, clipboard.read exists=${!!navigator.clipboard?.read}`);
-    
     // Mark that we're expecting a paste
     pendingPasteRef.current = true;
     
@@ -1338,12 +1312,10 @@ function CanvasInner({
     
     // Position the paste input on-screen so iOS shows the native paste popup
     setPasteInputPosition({ x: screenPos.x, y: screenPos.y, visible: true });
-    alert(`[handlePasteNodes] Set paste input position to x=${screenPos.x}, y=${screenPos.y}, visible=true`);
     
     // Focus the hidden input to receive paste events
     if (pasteTargetRef.current) {
       pasteTargetRef.current.focus();
-      alert(`[handlePasteNodes] Focused hidden input, document.activeElement=${document.activeElement?.tagName}`);
       
       // On iOS Safari, we need to select the input content to enable paste
       pasteTargetRef.current.select();
@@ -1352,24 +1324,19 @@ function CanvasInner({
       // Must be called synchronously during user activation
       try {
         const execResult = document.execCommand('paste');
-        alert(`[handlePasteNodes] execCommand('paste') returned: ${execResult}`);
         if (execResult) {
           // execCommand succeeded - the paste event handler will process it
           // Don't proceed with clipboard.read() as it will fail anyway
           return;
         }
-      } catch (err) {
-        alert(`[handlePasteNodes] execCommand('paste') threw: ${err}`);
+      } catch {
+        // execCommand not supported
       }
       
       // On iOS, the native paste popup should appear now - don't call clipboard.read()
       // as it will fail with NotAllowedError. Just wait for user to tap the native paste button.
       // We'll close the context menu but keep the paste input visible for iOS.
       setContextMenu(null);
-      
-      // For non-iOS or if clipboard.read() is available and works, continue below
-    } else {
-      alert('[handlePasteNodes] pasteTargetRef.current is null!');
     }
     
     // Try navigator.clipboard.read() as fallback for desktop browsers
@@ -1377,35 +1344,23 @@ function CanvasInner({
     if (navigator.clipboard?.read) {
       const pastePosition = contextMenuPositionRef.current;
       
-      alert('[handlePasteNodes] Calling navigator.clipboard.read()...');
-      
       navigator.clipboard.read().then(async (clipboardItems) => {
-        alert(`[handlePasteNodes] clipboard.read() SUCCESS! Items: ${clipboardItems.length}, pendingPaste=${pendingPasteRef.current}`);
-        
         // If we already handled paste via native event, skip
         if (!pendingPasteRef.current) {
-          alert('[handlePasteNodes] Already handled by native event, skipping');
           return;
         }
         
         for (const item of clipboardItems) {
-          // Check for image types
-          const typesStr = item.types.join(', ');
-          alert(`[handlePasteNodes] ClipboardItem types: ${typesStr}`);
-          
           const imageType = item.types.find(type => type.startsWith('image/'));
           if (imageType) {
-            alert(`[handlePasteNodes] Found image type: ${imageType}, getting blob...`);
             try {
               const blob = await item.getType(imageType);
-              alert(`[handlePasteNodes] Got blob! size=${blob.size}, type=${blob.type}`);
               const file = new File([blob], 'pasted-image.png', { type: imageType });
               onImagePaste(file, pastePosition);
               pendingPasteRef.current = false;
               setContextMenu(null);
               return;
-            } catch (err) {
-              alert(`[handlePasteNodes] Failed to get blob for ${imageType}: ${err}`);
+            } catch {
               // Failed to get image, continue
             }
           }
@@ -1482,10 +1437,9 @@ function CanvasInner({
           pendingPasteRef.current = false;
           setContextMenu(null);
         }
-      }).catch((err) => {
+      }).catch(() => {
         // Clipboard API failed - the native paste event handler will take over
         // if the user triggers a paste via keyboard or system menu
-        alert(`[handlePasteNodes] clipboard.read() FAILED: ${err?.name}: ${err?.message}`);
       });
     }
   }, [onNoteDuplicate, onImageDuplicate, onImagePaste]);
