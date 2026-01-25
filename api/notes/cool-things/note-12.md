@@ -7,10 +7,10 @@ tags:
   - japan
   - planning
 createdAt: '2026-01-16T14:45:20.316Z'
-updatedAt: '2026-01-24T22:45:47.325Z'
+updatedAt: '2026-01-25T20:27:51.203Z'
 position:
-  x: -3034.2403255415147
-  'y': 284.6902889454831
+  x: -2499.50467910268
+  'y': 69.82764390470737
 ---
 ## Day 1-3: Tokyo
 - Shibuya crossing

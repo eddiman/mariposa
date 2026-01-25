@@ -6,10 +6,10 @@ tags:
   - typescript
   - reference
 createdAt: '2026-01-16T14:45:17.767Z'
-updatedAt: '2026-01-24T22:45:47.325Z'
+updatedAt: '2026-01-25T20:27:14.365Z'
 position:
-  x: -2602.2403255415147
-  'y': -14.309711054516953
+  x: -3006.4265338119835
+  'y': 476.22443399358355
 ---
 ```typescript
 interface User {

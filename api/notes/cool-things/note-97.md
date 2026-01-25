@@ -7,10 +7,10 @@ tags:
   - web
   - mobile
 createdAt: '2026-01-24T20:21:20.664Z'
-updatedAt: '2026-01-24T22:45:47.325Z'
+updatedAt: '2026-01-25T20:27:15.628Z'
 position:
-  x: -2818.2403255415147
-  'y': 284.6902889454831
+  x: -2501.0992647068547
+  'y': -406.23132178882406
 ---
 1. Use semantic HTML elements
 2. Implement keyboard navigation

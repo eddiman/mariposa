@@ -132,6 +132,7 @@ function CanvasInner({
   const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'canvas' | 'node'; nodeId?: string } | null>(null);
   const [pasteInputPosition, setPasteInputPosition] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
+  const [isAnimating, setIsAnimating] = useState(false);
   const shiftKeyRef = useRef(false);
   const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const contextMenuPositionRef = useRef<Position>({ x: 0, y: 0 });
@@ -533,6 +534,9 @@ function CanvasInner({
       after: afterSnapshots,
     });
 
+    // Enable animation for alignment
+    setIsAnimating(true);
+    
     // Update positions while explicitly preserving selection
     setNodes(currentNodes => {
       const updateMap = new Map(updates.map(u => [u.id, { x: u.x, y: u.y }]));
@@ -549,6 +553,11 @@ function CanvasInner({
         return node;
       });
     });
+    
+    // Disable animation after transition completes
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 300);
     
     // Then persist positions (outside of setNodes to avoid re-render loop)
     for (const update of updates) {
@@ -1618,7 +1627,7 @@ function CanvasInner({
   }
 
   return (
-    <div className={`canvas-container ${isTouch && activeTool === 'pan' ? 'pan-mode' : ''}`} ref={setCanvasContainerRef}>
+    <div className={`canvas-container ${isTouch && activeTool === 'pan' ? 'pan-mode' : ''} ${isAnimating ? 'animating' : ''}`} ref={setCanvasContainerRef}>
       <ReactFlow
         nodes={nodes}
         edges={[]}

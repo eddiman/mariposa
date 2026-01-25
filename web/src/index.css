@@ -138,6 +138,11 @@ html, body {
   pointer-events: none;
 }
 
+/* Animate node positions when aligning */
+.canvas-container.animating .react-flow__node {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .canvas-loading {
   display: flex;
   align-items: center;
