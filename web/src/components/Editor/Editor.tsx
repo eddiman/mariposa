@@ -7,6 +7,7 @@ import { Extension } from '@tiptap/core';
 import { Markdown } from 'tiptap-markdown';
 import { useEffect, useCallback, useRef } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import styles from './Editor.module.css';
 
 // Use relative URLs - Vite proxy handles /api routes
 
@@ -114,6 +115,13 @@ const ImagePasteExtension = Extension.create({
 export function Editor({ content, onChange, placeholder = 'Start writing...', autoFocus = false }: EditorProps) {
   // Track internal content to avoid re-setting from prop when we just made the change
   const lastContentRef = useRef<string>(content);
+  // Track if we've completed initial mount to avoid state updates during render
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -146,10 +154,13 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
       attributes: {
-        class: 'editor-content',
+        class: styles['editor-content'],
       },
     },
     onUpdate: ({ editor }) => {
+      // Skip updates before component is mounted
+      if (!isMountedRef.current) return;
+      
       // Get markdown content instead of HTML
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const markdown = (editor.storage as any).markdown.getMarkdown() as string;
@@ -193,16 +204,16 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
   }, [editor]);
 
   if (!editor) {
-    return <div className="editor-loading">Loading editor...</div>;
+    return <div className={styles['editor-loading']}>Loading editor...</div>;
   }
 
   return (
-    <div className="editor-wrapper" onKeyDown={handleKeyDown}>
-      <div className="editor-toolbar">
+    <div className={styles['editor-wrapper']} onKeyDown={handleKeyDown}>
+      <div className={styles['editor-toolbar']}>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={editor.isActive('heading', { level: 1 }) ? 'active' : ''}
+          className={editor.isActive('heading', { level: 1 }) ? styles['active'] : ''}
           title="Heading 1"
         >
           H1
@@ -210,7 +221,7 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={editor.isActive('heading', { level: 2 }) ? 'active' : ''}
+          className={editor.isActive('heading', { level: 2 }) ? styles['active'] : ''}
           title="Heading 2"
         >
           H2
@@ -218,16 +229,16 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={editor.isActive('heading', { level: 3 }) ? 'active' : ''}
+          className={editor.isActive('heading', { level: 3 }) ? styles['active'] : ''}
           title="Heading 3"
         >
           H3
         </button>
-        <span className="toolbar-divider" />
+        <span className={styles['toolbar-divider']} />
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor.isActive('bold') ? 'active' : ''}
+          className={editor.isActive('bold') ? styles['active'] : ''}
           title="Bold"
         >
           B
@@ -235,7 +246,7 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor.isActive('italic') ? 'active' : ''}
+          className={editor.isActive('italic') ? styles['active'] : ''}
           title="Italic"
         >
           I
@@ -243,16 +254,16 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHighlight().run()}
-          className={editor.isActive('highlight') ? 'active' : ''}
+          className={editor.isActive('highlight') ? styles['active'] : ''}
           title="Highlight"
         >
           HL
         </button>
-        <span className="toolbar-divider" />
+        <span className={styles['toolbar-divider']} />
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive('bulletList') ? 'active' : ''}
+          className={editor.isActive('bulletList') ? styles['active'] : ''}
           title="Bullet List"
         >
           List
@@ -260,12 +271,12 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive('orderedList') ? 'active' : ''}
+          className={editor.isActive('orderedList') ? styles['active'] : ''}
           title="Numbered List"
         >
           1.
         </button>
-        <span className="toolbar-divider" />
+        <span className={styles['toolbar-divider']} />
         <button
           type="button"
           onClick={handleImageButtonClick}
