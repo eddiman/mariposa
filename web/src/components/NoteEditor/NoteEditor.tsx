@@ -407,3 +407,5 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
     </div>
   );
 }
+
+export default NoteEditor;

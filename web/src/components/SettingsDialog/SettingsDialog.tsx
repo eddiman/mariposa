@@ -83,3 +83,5 @@ export function SettingsDialog({
     </div>
   );
 }
+
+export default SettingsDialog;

@@ -324,3 +324,5 @@ export function CategoryDialog({
     </div>
   );
 }
+
+export default CategoryDialog;

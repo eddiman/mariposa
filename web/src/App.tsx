@@ -1,15 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
-import { CategoryDialog } from './components/CategoryDialog';
 import { Toolbar } from './components/Toolbar';
 import { SelectionToolbar } from './components/SelectionToolbar';
-import { SettingsDialog } from './components/SettingsDialog';
-import { NoteEditor } from './components/NoteEditor';
 import { ToolSwitcher } from './components/ToolSwitcher';
 import { GhostNote } from './components/GhostNote';
 import { PlacementHint } from './components/PlacementHint';
+
+// Lazy load dialogs and editor (not needed on initial render)
+const NoteEditor = lazy(() => import('./components/NoteEditor/NoteEditor'));
+const SettingsDialog = lazy(() => import('./components/SettingsDialog/SettingsDialog'));
+const CategoryDialog = lazy(() => import('./components/CategoryDialog/CategoryDialog'));
 import { useNotes } from './hooks/useNotes';
 import { useImages } from './hooks/useImages';
 import { useCanvas } from './hooks/useCanvas';
@@ -331,39 +333,51 @@ function AppContent() {
         onUpdateNodePositions={handleUpdateNodePositions}
       />
       
-      <SettingsDialog
-        open={settingsOpen}
-        settings={settings}
-        onSettingChange={updateSetting}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {/* Lazy-loaded dialogs */}
+      <Suspense fallback={null}>
+        {settingsOpen && (
+          <SettingsDialog
+            open={settingsOpen}
+            settings={settings}
+            onSettingChange={updateSetting}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+      </Suspense>
       
-      <CategoryDialog
-        open={categoryDialogOpen}
-        mode={categoryDialogMode}
-        categories={categories}
-        categoryToDelete={categoryToDelete}
-        categoryToRename={categoryToRename}
-        onCreate={handleCreateCategory}
-        onRename={handleRenameCategoryConfirm}
-        onDelete={handleDeleteCategoryConfirm}
-        onClose={handleCategoryDialogClose}
-      />
+      <Suspense fallback={null}>
+        {categoryDialogOpen && (
+          <CategoryDialog
+            open={categoryDialogOpen}
+            mode={categoryDialogMode}
+            categories={categories}
+            categoryToDelete={categoryToDelete}
+            categoryToRename={categoryToRename}
+            onCreate={handleCreateCategory}
+            onRename={handleRenameCategoryConfirm}
+            onDelete={handleDeleteCategoryConfirm}
+            onClose={handleCategoryDialogClose}
+          />
+        )}
+      </Suspense>
       
-      {focusedNoteSlug && (
-        <NoteEditor
-          slug={focusedNoteSlug}
-          originRect={originRect}
-          categories={categories}
-          initialNote={initialNoteForEditor}
-          sidebarOpen={sidebarOpen}
-          onClose={handleNoteClose}
-          onSave={handleNoteSave}
-          onDelete={handleNoteDelete}
-          onMoveToCategory={handleNoteMoveToCategory}
-          getNote={getNote}
-        />
-      )}
+      {/* Lazy-loaded note editor */}
+      <Suspense fallback={null}>
+        {focusedNoteSlug && (
+          <NoteEditor
+            slug={focusedNoteSlug}
+            originRect={originRect}
+            categories={categories}
+            initialNote={initialNoteForEditor}
+            sidebarOpen={sidebarOpen}
+            onClose={handleNoteClose}
+            onSave={handleNoteSave}
+            onDelete={handleNoteDelete}
+            onMoveToCategory={handleNoteMoveToCategory}
+            getNote={getNote}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

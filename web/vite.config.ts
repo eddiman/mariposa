@@ -15,4 +15,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split React Flow into its own chunk (large library)
+          'react-flow': ['@xyflow/react'],
+          // Split TipTap editor into its own chunk
+          'tiptap': [
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+            '@tiptap/extension-highlight',
+            '@tiptap/extension-placeholder',
+            '@tiptap/extension-image',
+          ],
+        },
+      },
+    },
+  },
 })
