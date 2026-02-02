@@ -1,0 +1,368 @@
+/* === Note Editor (Full-screen Focus Mode) === */
+.note-editor-fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-card);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  transform-origin: center center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.note-editor-fullscreen.expanded {
+  transform: none !important;
+  border-radius: 0 !important;
+}
+
+.expanded {
+  transform: none !important;
+  border-radius: 0 !important;
+}
+
+.note-editor-fullscreen.closing {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-radius 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.closing {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-radius 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Top bar with back button, status, and delete */
+.note-editor-topbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Extra left padding to avoid overlap with sidebar toggle button */
+  padding: 16px 24px 16px calc(24px + 44px + 1rem);
+  background: var(--color-card);
+  z-index: 10;
+  border-bottom: 1px solid transparent;
+  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shift topbar content when sidebar is open */
+.note-editor-topbar.sidebar-open {
+  padding-left: calc(280px + 24px);
+}
+
+.sidebar-open {
+  padding-left: calc(280px + 24px);
+}
+
+.note-editor-back {
+  width: 3rem;
+  height: 3rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.note-editor-back:hover {
+  background: #f0f0f0;
+  color: var(--color-text);
+}
+
+.note-editor-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-editor-unsaved,
+.note-editor-saving,
+.note-editor-saved {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.note-editor-saved {
+  color: #2ecc71;
+}
+
+.note-editor-delete {
+  width: 3rem;
+  height: 3rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.note-editor-delete:hover {
+  background: #fee;
+  color: #c00;
+}
+
+/* Scrollable content area */
+.note-editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 60px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Centered paper container */
+.note-editor-paper {
+  max-width: 700px;
+  /* margin: 0 auto; */
+  padding: 40px 0;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When sidebar is open, shift paper right by sidebar width */
+.note-editor-paper.sidebar-open {
+  margin-left: calc(280px + 24px);
+}
+
+.paper-sidebar-open {
+  margin-left: calc(280px + 24px);
+}
+
+/* Large title input */
+.note-editor-title {
+  width: 100%;
+  font-size: 40px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin-bottom: 24px;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  line-height: 1.2;
+}
+
+.note-editor-title::placeholder {
+  color: #ccc;
+}
+
+/* Tags section in editor */
+.note-editor-tags {
+  margin-bottom: 16px;
+}
+
+/* Loading and error states */
+.note-editor-loading-state,
+.note-editor-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+  gap: 16px;
+}
+
+.note-editor-error-state button {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  cursor: pointer;
+}
+
+/* === Note Editor Category === */
+.note-editor-category-row {
+  margin-bottom: 12px;
+}
+
+.note-editor-category-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.note-editor-category-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.note-editor-category-btn:hover {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
+.note-editor-category-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card-hover);
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.note-editor-category-option {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.note-editor-category-option:hover {
+  background: #f0f0f0;
+}
+
+.note-editor-category-option.active {
+  background: rgba(0, 102, 204, 0.08);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.active {
+  background: rgba(0, 102, 204, 0.08);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* === Note Editor Dates === */
+.note-editor-dates {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.note-editor-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-editor-date svg {
+  opacity: 0.6;
+}
+
+.note-editor-date-separator {
+  opacity: 0.4;
+}
+
+/* === Mobile Responsive === */
+@media (max-width: 768px) {
+  .note-editor-topbar {
+    /* padding: calc(12px + var(--safe-area-inset-top)) 16px 12px calc(16px + 44px + 2rem); */
+  }
+  
+  .note-editor-content {
+    padding: 0 1rem calc(40px + var(--safe-area-inset-bottom));
+  }
+  
+  .note-editor-paper {
+    padding: 1.5 0;
+  }
+  
+  .note-editor-title {
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+  
+  /* Increase touch targets */
+  .note-editor-back,
+  .note-editor-delete {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  /* Category selector in editor */
+  .note-editor-category-btn {
+    padding: 10px 14px;
+    min-height: 44px;
+  }
+  
+  .note-editor-category-option {
+    padding: 14px 16px;
+    min-height: 48px;
+  }
+}
+
+/* Small mobile breakpoint */
+@media (max-width: 480px) {
+  .note-editor-title {
+    font-size: 24px;
+  }
+  
+  .note-editor-paper {
+    padding: 16px 0;
+  }
+}
+
+/* === Touch Device Overrides === */
+@media (hover: none) {
+  /* Note editor back/delete - use active state */
+  .note-editor-back:hover,
+  .note-editor-delete:hover {
+    background: transparent;
+    color: var(--color-text-secondary);
+  }
+  
+  .note-editor-back:active {
+    background: #e0e0e0;
+    color: var(--color-text);
+  }
+  
+  .note-editor-delete:active {
+    background: #fee;
+    color: #c00;
+  }
+  
+  /* Note editor category button - use active state */
+  .note-editor-category-btn:hover {
+    background: transparent;
+    border-color: var(--color-border);
+  }
+  
+  .note-editor-category-btn:active {
+    background: #e0e0e0;
+  }
+  
+  /* Note editor category option - use active state */
+  .note-editor-category-option:hover {
+    background: transparent;
+  }
+  
+  .note-editor-category-option:active {
+    background: #e0e0e0;
+  }
+}

@@ -1,15 +1,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Editor } from './Editor';
-import { Dialog } from './Dialog';
-import { TagInput } from './TagInput';
-import type { Note, CategoryMeta } from '../types';
-import type { OriginRect } from './Canvas';
+import { Editor } from '../Editor';
+import { Dialog } from '../Dialog';
+import { TagInput } from '../TagInput';
+import type { Note, CategoryMeta } from '../../types';
+import type { OriginRect } from '../Canvas';
+import styles from './NoteEditor.module.css';
 
 interface NoteEditorProps {
   slug: string;
   originRect: OriginRect | null;
   categories: CategoryMeta[];
   initialNote?: Note | null; // Optional - skip loading if provided
+  sidebarOpen?: boolean;
   onClose: () => void;
   onSave: (slug: string, content: string, title: string, tags: string[]) => Promise<void>;
   onDelete: (slug: string) => Promise<void>;
@@ -19,7 +21,7 @@ interface NoteEditorProps {
 
 const AUTOSAVE_DELAY = 1500; // 1.5 seconds after user stops typing
 
-export function NoteEditor({ slug, originRect, categories, initialNote, onClose, onSave, onDelete, onMoveToCategory, getNote }: NoteEditorProps) {
+export function NoteEditor({ slug, originRect, categories, initialNote, sidebarOpen, onClose, onSave, onDelete, onMoveToCategory, getNote }: NoteEditorProps) {
   const [note, setNote] = useState<Note | null>(initialNote || null);
   const [loading, setLoading] = useState(!initialNote);
   const [title, setTitle] = useState(initialNote?.title || '');
@@ -57,6 +59,20 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
     });
     return () => cancelAnimationFrame(timer);
   }, []);
+
+  // Update state when switching to a different note (slug or initialNote changes)
+  useEffect(() => {
+    if (initialNote) {
+      setNote(initialNote);
+      setTitle(initialNote.title);
+      setContent(initialNote.content);
+      setTags(initialNote.tags || []);
+      setCategory(initialNote.category || '');
+      setLoading(false);
+      setHasChanges(false);
+      setLastSaved(null);
+    }
+  }, [slug, initialNote]);
 
   useEffect(() => {
     // Skip loading if we already have the note from initialNote
@@ -252,16 +268,16 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
 
   if (loading) {
     return (
-      <div className={`note-editor-fullscreen ${isExpanded ? 'expanded' : ''}`} style={getInitialStyle()}>
-        <div className="note-editor-loading-state">Loading...</div>
+      <div className={`${styles['note-editor-fullscreen']} ${isExpanded ? styles['expanded'] : ''}`} style={getInitialStyle()}>
+        <div className={styles['note-editor-loading-state']}>Loading...</div>
       </div>
     );
   }
 
   if (!note) {
     return (
-      <div className={`note-editor-fullscreen ${isExpanded ? 'expanded' : ''}`} style={getInitialStyle()}>
-        <div className="note-editor-error-state">
+      <div className={`${styles['note-editor-fullscreen']} ${isExpanded ? styles['expanded'] : ''}`} style={getInitialStyle()}>
+        <div className={styles['note-editor-error-state']}>
           <p>Note not found</p>
           <button onClick={onClose}>Close</button>
         </div>
@@ -271,25 +287,25 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
 
   return (
     <div 
-      className={`note-editor-fullscreen ${isExpanded ? 'expanded' : ''} ${isClosing ? 'closing' : ''}`}
+      className={`${styles['note-editor-fullscreen']} ${isExpanded ? styles['expanded'] : ''} ${isClosing ? styles['closing'] : ''}`}
       style={isExpanded ? {} : getInitialStyle()}
     >
       {/* Fixed header with back button and toolbar */}
-      <div className="note-editor-topbar">
-        <button className="note-editor-back" onClick={handleClose} title="Close (Esc)">
+      <div className={`${styles['note-editor-topbar']} ${sidebarOpen ? styles['sidebar-open'] : ''}`}>
+        <button className={styles['note-editor-back']} onClick={handleClose} title="Close (Esc)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
         </button>
         
-        <div className="note-editor-status">
-          {saving && <span className="note-editor-saving">Saving...</span>}
-          {!saving && hasChanges && <span className="note-editor-unsaved">Unsaved</span>}
-          {!saving && !hasChanges && lastSaved && <span className="note-editor-saved">Saved</span>}
+        <div className={styles['note-editor-status']}>
+          {saving && <span className={styles['note-editor-saving']}>Saving...</span>}
+          {!saving && hasChanges && <span className={styles['note-editor-unsaved']}>Unsaved</span>}
+          {!saving && !hasChanges && lastSaved && <span className={styles['note-editor-saved']}>Saved</span>}
         </div>
 
         <button 
-          className="note-editor-delete"
+          className={styles['note-editor-delete']}
           onClick={handleDeleteClick}
           title="Delete note"
         >
@@ -300,21 +316,21 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
       </div>
 
       {/* Content area */}
-      <div className="note-editor-content">
-        <div className="note-editor-paper">
+      <div className={styles['note-editor-content']}>
+        <div className={`${styles['note-editor-paper']} ${sidebarOpen ? styles['paper-sidebar-open'] : ''}`}>
           <input
             type="text"
             value={title}
             onChange={handleTitleChange}
-            className="note-editor-title"
+            className={styles['note-editor-title']}
             placeholder="Untitled"
           />
           
           {/* Category selector */}
-          <div className="note-editor-category-row">
-            <div className="note-editor-category-wrapper" ref={categoryDropdownRef}>
+          <div className={styles['note-editor-category-row']}>
+            <div className={styles['note-editor-category-wrapper']} ref={categoryDropdownRef}>
               <button 
-                className="note-editor-category-btn"
+                className={styles['note-editor-category-btn']}
                 onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -327,9 +343,9 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
               </button>
               
               {categoryDropdownOpen && (
-                <div className="note-editor-category-dropdown">
+                <div className={styles['note-editor-category-dropdown']}>
                   <button
-                    className={`note-editor-category-option ${category === 'all-notes' ? 'active' : ''}`}
+                    className={`${styles['note-editor-category-option']} ${category === 'all-notes' ? styles['active'] : ''}`}
                     onClick={() => handleCategorySelect('all-notes')}
                   >
                     All Notes
@@ -337,7 +353,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
                   {categories.map(cat => (
                     <button
                       key={cat.name}
-                      className={`note-editor-category-option ${category === cat.name ? 'active' : ''}`}
+                      className={`${styles['note-editor-category-option']} ${category === cat.name ? styles['active'] : ''}`}
                       onClick={() => handleCategorySelect(cat.name)}
                     >
                       {cat.displayName}
@@ -349,21 +365,21 @@ export function NoteEditor({ slug, originRect, categories, initialNote, onClose,
           </div>
 
           {/* Date metadata */}
-          <div className="note-editor-dates">
-            <span className="note-editor-date">
+          <div className={styles['note-editor-dates']}>
+            <span className={styles['note-editor-date']}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
               Updated {formatDate(note.updatedAt)}
             </span>
-            <span className="note-editor-date-separator">·</span>
-            <span className="note-editor-date">
+            <span className={styles['note-editor-date-separator']}>·</span>
+            <span className={styles['note-editor-date']}>
               Created {formatDate(note.createdAt)}
             </span>
           </div>
           
-          <div className="note-editor-tags">
+          <div className={styles['note-editor-tags']}>
             <TagInput
               tags={tags}
               onChange={handleTagsChange}
