@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle, type FocusOnNodeOptions } from './components/Canvas';
+import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
 import { CategoryDialog } from './components/CategoryDialog';
 import { Toolbar } from './components/Toolbar';
@@ -14,6 +14,7 @@ import { useNotes } from './hooks/useNotes';
 import { useImages } from './hooks/useImages';
 import { useCanvas } from './hooks/useCanvas';
 import { useSettings } from './hooks/useSettings';
+import { useSidebarNotes } from './hooks/useSidebarNotes';
 import { isTouchDevice } from './utils/platform.js';
 import { 
   EditorProvider, 
@@ -88,12 +89,27 @@ function AppContent() {
   const { notes, loading, getNote, createNote, updateNote, updatePosition, deleteNote, duplicateNote, moveToCategory: moveNoteToCategory } = useNotes(notesOptions);
   const { images, uploadImage, duplicateImage, updateImagePosition, updateImageSize, deleteImage, moveToCategory: moveImageToCategory } = useImages(imagesOptions);
 
-  // Track initial note data when opening editor (to avoid loading flash) - handled by EditorContext
-  
+  // Sidebar notes hook
+  const {
+    handleFocusOnNodeRef,
+    handleSidebarNoteClick,
+    handleSidebarNoteEdit,
+    handleSidebarAddNote,
+  } = useSidebarNotes({
+    notes,
+    currentSpace,
+    focusedNoteSlug,
+    isCreating,
+    setCurrentSpace,
+    setFocusedNoteSlug,
+    setIsCreating,
+    prepareEditorOpen,
+    createNote,
+  });
+
   // Selection state for alignment toolbar
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const updateNodePositionsRef = useRef<((updates: NodePositionUpdate[]) => void) | null>(null);
-  const focusOnNodeRef = useRef<((nodeId: string, options?: FocusOnNodeOptions) => void) | null>(null);
   
   // History state for undo/redo (will be used by context menu later)
   const [_historyHandle, setHistoryHandle] = useState<CanvasHistoryHandle | null>(null);
@@ -111,10 +127,6 @@ function AppContent() {
 
   const handleUpdateNodePositionsRef = useCallback((handler: (updates: NodePositionUpdate[]) => void) => {
     updateNodePositionsRef.current = handler;
-  }, []);
-
-  const handleFocusOnNodeRef = useCallback((handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => {
-    focusOnNodeRef.current = handler;
   }, []);
 
   const handleHistoryChange = useCallback((handle: CanvasHistoryHandle) => {
@@ -231,120 +243,6 @@ function AppContent() {
       setCurrentSpace(null);
     }
   }, [deleteCategory, currentSpace, setCurrentSpace]);
-
-    const focusTimeDuration = 500;
-
-  // Sidebar note handlers
-  const handleSidebarNoteClick = useCallback((category: string, slug: string) => {
-    // Navigate to the category where the note lives
-    const targetCategory = category === 'uncategorized' ? null : category;
-    setCurrentSpace(targetCategory);
-    // Find the note data
-    const note = notes.find(n => n.slug === slug);
-    const noteCategory = note?.category || category;
-    
-    // Helper to open the note editor
-    const openNoteEditor = () => {
-      prepareEditorOpen({
-        x: window.innerWidth / 2 - 100,
-        y: window.innerHeight / 2 - 141,
-        width: 200,
-        height: 283,
-      }, note || null);
-      setFocusedNoteSlug(slug, noteCategory);
-    };
-    
-    // Check if a note is already open
-    if (focusedNoteSlug) {
-      // Note already open - open new note immediately, focus in background
-      openNoteEditor();
-      setTimeout(() => {
-        if (focusOnNodeRef.current) {
-          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
-        }
-      }, 100);
-    } else {
-      // No note open - just focus on canvas (pan/zoom + highlight), do NOT open
-      setTimeout(() => {
-        if (focusOnNodeRef.current) {
-          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
-        }
-      }, 100);
-    }
-  }, [setCurrentSpace, notes, focusedNoteSlug, prepareEditorOpen, setFocusedNoteSlug]);
-
-  const handleSidebarNoteEdit = useCallback((slug: string) => {
-    // Chevron click - opens the note editor
-    const note = notes.find(n => n.slug === slug);
-    const noteCategory = note?.category || currentSpace || 'uncategorized';
-    
-    // Navigate to the category where the note lives
-    const targetCategory = noteCategory === 'uncategorized' ? null : noteCategory;
-    setCurrentSpace(targetCategory);
-    
-    // Helper to open the note editor
-    const openNoteEditor = () => {
-      prepareEditorOpen({
-        x: window.innerWidth / 2 - 100,
-        y: window.innerHeight / 2 - 141,
-        width: 200,
-        height: 283,
-      }, note || null);
-      setFocusedNoteSlug(slug, noteCategory);
-    };
-    
-    // Check if a note is already open
-    if (focusedNoteSlug) {
-      // Note already open - open new note immediately, focus in background
-      openNoteEditor();
-      setTimeout(() => {
-        if (focusOnNodeRef.current) {
-          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
-        }
-      }, 100);
-    } else {
-      // No note open - focus first, then open after animation completes
-      setTimeout(() => {
-        if (focusOnNodeRef.current) {
-          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
-        }
-        // Open note after focus animation (800ms) + highlight animation (800ms)
-        setTimeout(() => {
-          openNoteEditor();
-        }, focusTimeDuration * 2);
-      }, 100);
-    }
-  }, [notes, prepareEditorOpen, setFocusedNoteSlug, currentSpace, setCurrentSpace, focusedNoteSlug]);
-
-  const handleSidebarAddNote = useCallback(async (category: string) => {
-    if (isCreating) return null;
-    setIsCreating(true);
-    
-    // Create note at a default center position
-    const defaultPosition: Position = { x: 0, y: 0 };
-    
-    const newNote = await createNote({
-      title: 'Untitled Note',
-      content: '',
-      category,
-      position: defaultPosition,
-    });
-    
-    setIsCreating(false);
-    
-    if (newNote) {
-      // Open the new note for editing
-      prepareEditorOpen({
-        x: window.innerWidth / 2 - 100,
-        y: window.innerHeight / 2 - 141,
-        width: 200,
-        height: 283,
-      }, newNote);
-      setFocusedNoteSlug(newNote.slug, category);
-      return newNote;
-    }
-    return null;
-  }, [createNote, isCreating, setIsCreating, prepareEditorOpen, setFocusedNoteSlug]);
 
   // Wrapper for moving notes - also refetches category counts
   const handleNoteMoveToCategory = useCallback(async (slug: string, category: string) => {
