@@ -1,0 +1,58 @@
+/* === Tool Switcher (Mobile Canvas Tools) === */
+.tool-switcher {
+  position: fixed;
+  bottom: calc(1rem + var(--safe-area-inset-bottom));
+  left: 3rem;
+  z-index: 100;
+  display: flex;
+  background: var(--color-card);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: left 0.15s ease-out;
+}
+
+.tool-switcher.sidebar-open {
+  left: 19rem;
+}
+
+.tool-switcher-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tool-switcher-btn:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+.tool-switcher-btn:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tool-switcher-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.tool-switcher-btn.active:active {
+  background: var(--color-primary);
+}
+
+.tool-switcher-btn svg {
+  flex-shrink: 0;
+}
+
+/* === Small Mobile Responsive === */
+@media (max-width: 480px) {
+  .tool-switcher, .tool-switcher.sidebar-open {
+    left: calc(1rem + var(--safe-area-inset-left));
+  }
+}

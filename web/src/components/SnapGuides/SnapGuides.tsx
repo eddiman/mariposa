@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { useViewport } from '@xyflow/react';
+import styles from './SnapGuides.module.css';
 
 export interface GuideLine {
   type: 'vertical' | 'horizontal';
@@ -24,7 +25,7 @@ export const SnapGuides = memo(function SnapGuides({ guides }: SnapGuidesProps) 
   });
 
   return (
-    <svg className="snap-guides">
+    <svg className={styles['snap-guides']}>
       {guides.map((guide, index) => {
         if (guide.type === 'vertical') {
           const start = toScreen(guide.position, guide.start);
@@ -32,7 +33,7 @@ export const SnapGuides = memo(function SnapGuides({ guides }: SnapGuidesProps) 
           return (
             <line
               key={index}
-              className="snap-guide-line"
+              className={styles['snap-guide-line']}
               x1={start.x}
               y1={start.y}
               x2={end.x}
@@ -45,7 +46,7 @@ export const SnapGuides = memo(function SnapGuides({ guides }: SnapGuidesProps) 
           return (
             <line
               key={index}
-              className="snap-guide-line"
+              className={styles['snap-guide-line']}
               x1={start.x}
               y1={start.y}
               x2={end.x}

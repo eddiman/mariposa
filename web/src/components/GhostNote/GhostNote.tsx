@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { isTouchDevice } from '../utils/platform.js';
+import { isTouchDevice } from '../../utils/platform.js';
+import styles from './GhostNote.module.css';
 
 interface GhostNoteProps {
   visible: boolean;
@@ -34,15 +35,15 @@ export function GhostNote({ visible }: GhostNoteProps) {
 
   return (
     <div
-      className="ghost-note"
+      className={styles['ghost-note']}
       style={{
         left: position.x + offsetX,
         top: position.y + offsetY,
       }}
     >
-      <div className="ghost-note-paper">
-        <h3 className="ghost-note-title">Untitled Note</h3>
-        <p className="ghost-note-hint">Click to place</p>
+      <div className={styles['ghost-note-paper']}>
+        <h3 className={styles['ghost-note-title']}>Untitled Note</h3>
+        <p className={styles['ghost-note-hint']}>Click to place</p>
       </div>
     </div>
   );

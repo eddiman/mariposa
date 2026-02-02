@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Node } from '@xyflow/react';
+import styles from './SelectionToolbar.module.css';
 
 // Node dimensions for alignment calculations
 const NODE_DIMENSIONS = {
@@ -213,10 +214,13 @@ export function SelectionToolbar({ selectedNodes, onUpdateNodePositions }: Selec
     return null;
   }
 
+  // Get the animation state class
+  const stateClass = styles[`selection-toolbar--${animationState}`];
+
   return (
-    <div className={`selection-toolbar selection-toolbar--${animationState}`}>
+    <div className={`${styles['selection-toolbar']} ${stateClass}`}>
       <button
-        className="selection-toolbar-button"
+        className={styles['selection-toolbar-button']}
         onClick={handleAlignLeft}
         title="Align Left (⌥A)"
       >
@@ -228,7 +232,7 @@ export function SelectionToolbar({ selectedNodes, onUpdateNodePositions }: Selec
       </button>
 
       <button
-        className="selection-toolbar-button"
+        className={styles['selection-toolbar-button']}
         onClick={handleAlignTop}
         title="Align Top (⌥W)"
       >
@@ -240,7 +244,7 @@ export function SelectionToolbar({ selectedNodes, onUpdateNodePositions }: Selec
       </button>
 
       <button
-        className="selection-toolbar-button"
+        className={styles['selection-toolbar-button']}
         onClick={handleAlignBottom}
         title="Align Bottom (⌥S)"
       >
@@ -252,7 +256,7 @@ export function SelectionToolbar({ selectedNodes, onUpdateNodePositions }: Selec
       </button>
 
       <button
-        className="selection-toolbar-button"
+        className={styles['selection-toolbar-button']}
         onClick={handleAlignRight}
         title="Align Right (⌥D)"
       >
@@ -264,7 +268,7 @@ export function SelectionToolbar({ selectedNodes, onUpdateNodePositions }: Selec
       </button>
 
       <button
-        className="selection-toolbar-button"
+        className={styles['selection-toolbar-button']}
         onClick={handleTidyUp}
         title="Tidy Up / Snap to Grid (⌥T)"
       >

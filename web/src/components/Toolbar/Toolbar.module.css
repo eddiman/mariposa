@@ -1,0 +1,58 @@
+/* === Toolbar === */
+.toolbar {
+  position: fixed;
+  bottom: calc(1rem + var(--safe-area-inset-bottom));
+  right: calc(1rem + var(--safe-area-inset-right));
+  display: flex;
+  gap: 12px;
+  z-index: 100;
+}
+
+.toolbar-button {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+  box-shadow: var(--shadow-card-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.toolbar-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 32px rgba(0, 102, 204, 0.4);
+}
+
+.toolbar-button:active {
+  transform: scale(0.95);
+}
+
+/* FAB active state during placement mode */
+.toolbar-button.active {
+  background: #c0392b;
+}
+
+/* === Mobile Responsive === */
+@media (max-width: 768px) {
+  .toolbar {
+    bottom: calc(1rem + var(--safe-area-inset-bottom));
+    right: calc(1rem + var(--safe-area-inset-right));
+  }
+}
+
+/* === Touch Device Overrides === */
+@media (hover: none) {
+  .toolbar-button:hover {
+    transform: none;
+    box-shadow: var(--shadow-card-hover);
+  }
+  
+  .toolbar-button:active {
+    transform: scale(0.95);
+  }
+}

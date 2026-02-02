@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, type KeyboardEvent } from 'react';
+import styles from './TagInput.module.css';
 
 interface TagInputProps {
   tags: string[];
@@ -45,14 +46,14 @@ export function TagInput({ tags, onChange, placeholder = 'Add tag...' }: TagInpu
   }, []);
 
   return (
-    <div className="tag-input-container" onClick={handleContainerClick}>
-      <div className="tag-input-tags">
+    <div className={styles['tag-input-container']} onClick={handleContainerClick}>
+      <div className={styles['tag-input-tags']}>
         {tags.map(tag => (
-          <span key={tag} className="tag-input-tag">
+          <span key={tag} className={styles['tag-input-tag']}>
             {tag}
             <button
               type="button"
-              className="tag-input-remove"
+              className={styles['tag-input-remove']}
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
@@ -73,7 +74,7 @@ export function TagInput({ tags, onChange, placeholder = 'Add tag...' }: TagInpu
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder={tags.length === 0 ? placeholder : ''}
-          className="tag-input-field"
+          className={styles['tag-input-field']}
         />
       </div>
     </div>

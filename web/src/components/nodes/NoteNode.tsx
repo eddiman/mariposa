@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
-// import { isTouchDevice } from '../../utils/platform.js'; // Unused - see TODO below
+import styles from './NoteNode.module.css';
 import type { Note } from '../../types';
 
 export interface OriginRect {
@@ -19,6 +19,7 @@ export interface NoteNodeData extends Note {
   onOpen: (slug: string, category: string, originRect: OriginRect) => void;
   categoryDisplayName?: string;
   isPanMode?: boolean;
+  isHighlighted?: boolean;
   [key: string]: unknown; // Allow index signature for React Flow
 }
 
@@ -69,8 +70,6 @@ function ReadOnlyContent({ content }: { content: string }) {
 
 function NoteNodeComponent({ data }: { data: NoteNodeData }) {
   const nodeRef = useRef<HTMLDivElement>(null);
-  // const lastTapRef = useRef<number>(0); // Unused - see TODO below
-  // const doubleTapTimeout = 300; // ms threshold for double-tap - Unused - see TODO below
 
   const openNote = useCallback(() => {
     if (nodeRef.current) {
@@ -93,44 +92,21 @@ function NoteNodeComponent({ data }: { data: NoteNodeData }) {
     openNote();
   }, [openNote, data.isPanMode]);
 
-  // TODO: Double-tap to open note - currently disabled because it interferes with
-  // pinch-to-zoom gestures on mobile. The double-tap detection fires during zoom,
-  // causing notes to open unexpectedly. Need to find a way to differentiate between
-  // intentional double-tap and zoom gesture.
-  //
-  // Handle touch events for double-tap detection on mobile
-  // const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-  //   if (!isTouchDevice()) return;
-  //   
-  //   const now = Date.now();
-  //   const timeSinceLastTap = now - lastTapRef.current;
-  //   
-  //   if (timeSinceLastTap < doubleTapTimeout && timeSinceLastTap > 0) {
-  //     // Double tap detected
-  //     e.preventDefault();
-  //     openNote();
-  //     lastTapRef.current = 0; // Reset to prevent triple-tap
-  //   } else {
-  //     lastTapRef.current = now;
-  //   }
-  // }, [openNote]);
-
   return (
     <div 
       ref={nodeRef}
-      className="note-node"
+      className={`${styles['note-node']}${data.isHighlighted ? ` ${styles.highlighted}` : ''}`}
       onDoubleClick={handleDoubleClick}
-      // onTouchEnd={handleTouchEnd} // Disabled - see TODO above
     >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
       
-      <div className="note-node-paper">
-        <h1 className="note-node-title">{data.title || 'Untitled'}</h1>
+      <div className={styles['note-node-paper']}>
+        <h1 className={styles['note-node-title']}>{data.title || 'Untitled'}</h1>
         {data.categoryDisplayName && data.category !== 'all-notes' && (
-          <div className="note-node-category">in: {data.categoryDisplayName}</div>
+          <div className={styles['note-node-category']}>in: {data.categoryDisplayName}</div>
         )}
         <ReadOnlyContent content={data.content} />
-        <div className="note-node-fade" />
+        <div className={styles['note-node-fade']} />
       </div>
       
       <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />

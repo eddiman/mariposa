@@ -1,3 +1,5 @@
+import styles from './Toolbar.module.css';
+
 interface ToolbarProps {
   isPlacementMode: boolean;
   onTogglePlacementMode: () => void;
@@ -5,9 +7,9 @@ interface ToolbarProps {
 
 export function Toolbar({ isPlacementMode, onTogglePlacementMode }: ToolbarProps) {
   return (
-    <div className="toolbar">
+    <div className={styles.toolbar}>
       <button
-        className={`toolbar-button create-note ${isPlacementMode ? 'active' : ''}`}
+        className={`${styles['toolbar-button']} ${isPlacementMode ? styles.active : ''}`}
         onClick={onTogglePlacementMode}
         title={isPlacementMode ? 'Cancel placement' : 'Create new note'}
       >

@@ -1,0 +1,169 @@
+/* === Selection Toolbar === */
+.selection-toolbar {
+  position: fixed;
+  bottom: calc(1rem + var(--safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-overlay);
+  z-index: 150;
+  /* Initial circle state */
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+/* Entering animation - rise up and expand */
+.selection-toolbar--entering {
+  animation: selectionToolbarEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Expanded state */
+.selection-toolbar--expanded {
+  width: auto;
+  min-width: 15px;
+  border-radius: var(--radius-pill);
+}
+
+/* Exiting animation - collapse and sink */
+.selection-toolbar--exiting {
+  animation: selectionToolbarExit 0.2s ease-out forwards;
+}
+
+@keyframes selectionToolbarEnter {
+  0% {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+    width: 56px;
+    border-radius: 50%;
+  }
+  50% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    width: 56px;
+    border-radius: 50%;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    width: 280px;
+    border-radius: 28px;
+  }
+}
+
+@keyframes selectionToolbarExit {
+  0% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    width: 280px;
+  }
+  50% {
+    width: 56px;
+    border-radius: 50%;
+  }
+  100% {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+    width: 56px;
+    border-radius: 50%;
+  }
+}
+
+/* Toolbar buttons */
+.selection-toolbar-button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+/* Fade in buttons when entering/expanded */
+.selection-toolbar--entering .selection-toolbar-button,
+.selection-toolbar--expanded .selection-toolbar-button {
+  animation: selectionToolbarButtonFadeIn 0.2s ease forwards;
+}
+
+/* Staggered delays for buttons */
+.selection-toolbar--entering .selection-toolbar-button:nth-child(1),
+.selection-toolbar--expanded .selection-toolbar-button:nth-child(1) {
+  animation-delay: 0.25s;
+}
+.selection-toolbar--entering .selection-toolbar-button:nth-child(2),
+.selection-toolbar--expanded .selection-toolbar-button:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.selection-toolbar--entering .selection-toolbar-button:nth-child(3),
+.selection-toolbar--expanded .selection-toolbar-button:nth-child(3) {
+  animation-delay: 0.35s;
+}
+.selection-toolbar--entering .selection-toolbar-button:nth-child(4),
+.selection-toolbar--expanded .selection-toolbar-button:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.selection-toolbar--entering .selection-toolbar-button:nth-child(5),
+.selection-toolbar--expanded .selection-toolbar-button:nth-child(5) {
+  animation-delay: 0.45s;
+}
+
+/* Keep buttons visible once expanded */
+.selection-toolbar--expanded .selection-toolbar-button {
+  opacity: 1;
+  animation: none;
+}
+
+@keyframes selectionToolbarButtonFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Button hover and active states */
+.selection-toolbar-button:hover {
+  background: #f0f0f0;
+  color: var(--color-text);
+}
+
+.selection-toolbar-button:active {
+  background: #e0e0e0;
+  transform: scale(0.95);
+}
+
+/* === Mobile Responsive === */
+@media (max-width: 768px) {
+  .selection-toolbar {
+    bottom: calc(5rem + var(--safe-area-inset-bottom));
+  }
+}
+
+/* === Touch Device Overrides === */
+@media (hover: none) {
+  .selection-toolbar-button:hover {
+    background: transparent;
+    color: var(--color-text-secondary);
+  }
+  
+  .selection-toolbar-button:active {
+    background: #e0e0e0;
+    color: var(--color-text);
+  }
+}

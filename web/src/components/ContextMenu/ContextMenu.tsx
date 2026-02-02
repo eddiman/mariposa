@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import styles from './ContextMenu.module.css';
 
 export interface ContextMenuItem {
   label: string;
@@ -87,7 +88,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     // Handle button touches - find and activate the tapped item
     const handleMenuTouch = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      const button = target.closest('button.context-menu-item') as HTMLButtonElement | null;
+      const button = target.closest(`button.${styles['context-menu-item']}`) as HTMLButtonElement | null;
       
       if (!button) return;
       
@@ -155,33 +156,33 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       {/* Invisible backdrop to catch outside clicks/taps */}
       <div 
         ref={backdropRef}
-        className="context-menu-backdrop"
+        className={styles['context-menu-backdrop']}
         onClick={onClose}
       />
       
       <div
         ref={menuRef}
-        className="context-menu"
+        className={styles['context-menu']}
         style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
         onContextMenu={(e) => e.preventDefault()}
       >
         {items.map((item, index) => (
           item.divider ? (
-            <div key={index} className="context-menu-divider" />
+            <div key={index} className={styles['context-menu-divider']} />
           ) : (
-            <div key={index} className="context-menu-item-wrapper">
+            <div key={index} className={styles['context-menu-item-wrapper']}>
               <button
                 data-item-index={index}
-                className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''} ${item.submenu ? 'has-submenu' : ''}`}
+                className={`${styles['context-menu-item']} ${item.disabled ? styles.disabled : ''} ${item.danger ? styles.danger : ''} ${item.submenu ? styles['has-submenu'] : ''}`}
                 onClick={() => handleItemClick(item)}
                 onMouseEnter={() => handleItemMouseEnter(index, item)}
                 disabled={item.disabled && !item.submenu}
               >
-                {item.icon && <span className="context-menu-icon">{item.icon}</span>}
-                <span className="context-menu-label">{item.label}</span>
-                {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
+                {item.icon && <span className={styles['context-menu-icon']}>{item.icon}</span>}
+                <span className={styles['context-menu-label']}>{item.label}</span>
+                {item.shortcut && <span className={styles['context-menu-shortcut']}>{item.shortcut}</span>}
                 {item.submenu && (
-                  <span className="context-menu-arrow">
+                  <span className={styles['context-menu-arrow']}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
@@ -191,22 +192,22 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
               
               {/* Submenu - positioned via CSS relative to parent */}
               {item.submenu && openSubmenu === index && (
-                <div className="context-menu context-submenu">
+                <div className={`${styles['context-menu']} ${styles['context-submenu']}`}>
                   {item.submenu.map((subItem, subIndex) => (
                     subItem.divider ? (
-                      <div key={subIndex} className="context-menu-divider" />
+                      <div key={subIndex} className={styles['context-menu-divider']} />
                     ) : (
                       <button
                         key={subIndex}
                         data-item-index={index}
                         data-sub-item-index={subIndex}
-                        className={`context-menu-item ${subItem.disabled ? 'disabled' : ''} ${subItem.danger ? 'danger' : ''}`}
+                        className={`${styles['context-menu-item']} ${subItem.disabled ? styles.disabled : ''} ${subItem.danger ? styles.danger : ''}`}
                         onClick={() => handleSubmenuItemClick(subItem)}
                         disabled={subItem.disabled}
                       >
-                        {subItem.icon && <span className="context-menu-icon">{subItem.icon}</span>}
-                        <span className="context-menu-label">{subItem.label}</span>
-                        {subItem.shortcut && <span className="context-menu-shortcut">{subItem.shortcut}</span>}
+                        {subItem.icon && <span className={styles['context-menu-icon']}>{subItem.icon}</span>}
+                        <span className={styles['context-menu-label']}>{subItem.label}</span>
+                        {subItem.shortcut && <span className={styles['context-menu-shortcut']}>{subItem.shortcut}</span>}
                       </button>
                     )
                   ))}

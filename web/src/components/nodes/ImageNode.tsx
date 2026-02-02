@@ -1,8 +1,7 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
+import styles from './ImageNode.module.css';
 import type { CanvasImage } from '../../types';
-
-// Use relative URLs - Vite proxy handles /api routes
 
 export interface ImageNodeData extends CanvasImage {
   onResize?: (id: string, width: number, height: number) => void;
@@ -84,23 +83,23 @@ function ImageNodeComponent({ data, selected }: ImageNodeProps) {
   const renderContent = () => {
     if (isUploading) {
       return (
-        <div className="image-node-placeholder">
-          <div className="image-node-spinner" />
-          <span className="image-node-placeholder-text">Pasting image...</span>
+        <div className={styles['image-node-placeholder']}>
+          <div className={styles['image-node-spinner']} />
+          <span className={styles['image-node-placeholder-text']}>Pasting image...</span>
         </div>
       );
     }
     
     if (isError) {
       return (
-        <div className="image-node-placeholder image-node-error">
+        <div className={`${styles['image-node-placeholder']} ${styles['image-node-error']}`}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="15" y1="9" x2="9" y2="15" />
             <line x1="9" y1="9" x2="15" y2="15" />
           </svg>
-          <span className="image-node-placeholder-text">Couldn't paste image</span>
-          <span className="image-node-error-hint">Select and delete to remove</span>
+          <span className={styles['image-node-placeholder-text']}>Couldn't paste image</span>
+          <span className={styles['image-node-error-hint']}>Select and delete to remove</span>
         </div>
       );
     }
@@ -109,7 +108,7 @@ function ImageNodeComponent({ data, selected }: ImageNodeProps) {
       <img
         src={data.webpUrl}
         alt=""
-        className="image-node-img"
+        className={styles['image-node-img']}
         draggable={false}
       />
     );
@@ -118,7 +117,7 @@ function ImageNodeComponent({ data, selected }: ImageNodeProps) {
   return (
     <div 
       ref={nodeRef}
-      className={`image-node ${selected ? 'selected' : ''} ${isUploading ? 'uploading' : ''} ${isError ? 'error' : ''}`}
+      className={`${styles['image-node']} ${selected ? styles.selected : ''} ${isUploading ? styles.uploading : ''} ${isError ? styles.error : ''}`}
       style={{
         width: currentSize.width,
         height: currentSize.height,
@@ -131,7 +130,7 @@ function ImageNodeComponent({ data, selected }: ImageNodeProps) {
       {/* Resize handle - only show for ready images */}
       {isReady && (
         <div
-          className="image-node-resize-handle nodrag nopan"
+          className={`${styles['image-node-resize-handle']} nodrag nopan`}
           onMouseDown={handleMouseDown}
         />
       )}

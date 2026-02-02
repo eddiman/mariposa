@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { isTouchDevice } from '../utils/platform.js';
+import { isTouchDevice } from '../../utils/platform.js';
+import styles from './PlacementHint.module.css';
 
 interface PlacementHintProps {
   visible: boolean;
@@ -24,8 +25,8 @@ export function PlacementHint({ visible }: PlacementHintProps) {
   if (!isTouch || !show) return null;
 
   return (
-    <div className="placement-hint">
-      <span className="placement-hint-text">Tap to place note</span>
+    <div className={styles['placement-hint']}>
+      <span className={styles['placement-hint-text']}>Tap to place note</span>
     </div>
   );
 }

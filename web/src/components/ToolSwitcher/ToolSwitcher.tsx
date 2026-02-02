@@ -1,4 +1,5 @@
-import type { CanvasTool } from '../types';
+import type { CanvasTool } from '../../types';
+import styles from './ToolSwitcher.module.css';
 
 interface ToolSwitcherProps {
   activeTool: CanvasTool;
@@ -8,9 +9,9 @@ interface ToolSwitcherProps {
 
 export function ToolSwitcher({ activeTool, onToolChange, sidebarOpen }: ToolSwitcherProps) {
   return (
-    <div className={`tool-switcher ${sidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`${styles['tool-switcher']} ${sidebarOpen ? styles['sidebar-open'] : ''}`}>
       <button
-        className={`tool-switcher-btn ${activeTool === 'pan' ? 'active' : ''}`}
+        className={`${styles['tool-switcher-btn']} ${activeTool === 'pan' ? styles.active : ''}`}
         onClick={() => onToolChange('pan')}
         aria-label="Pan tool"
         title="Pan (drag to pan, pinch to zoom)"
@@ -23,7 +24,7 @@ export function ToolSwitcher({ activeTool, onToolChange, sidebarOpen }: ToolSwit
         </svg>
       </button>
       <button
-        className={`tool-switcher-btn ${activeTool === 'select' ? 'active' : ''}`}
+        className={`${styles['tool-switcher-btn']} ${activeTool === 'select' ? styles.active : ''}`}
         onClick={() => onToolChange('select')}
         aria-label="Select tool"
         title="Select (tap to select, drag to move)"

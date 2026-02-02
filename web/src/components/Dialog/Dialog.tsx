@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import styles from './Dialog.module.css';
 
 interface DialogProps {
   open: boolean;
@@ -42,16 +43,16 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div className="dialog-overlay" onClick={onCancel}>
-      <div className="dialog-container" onClick={e => e.stopPropagation()}>
-        <h2 className="dialog-title">{title}</h2>
-        <p className="dialog-message">{message}</p>
-        <div className="dialog-actions">
-          <button className="dialog-button dialog-button-cancel" onClick={onCancel}>
+    <div className={styles['dialog-overlay']} onClick={onCancel}>
+      <div className={styles['dialog-container']} onClick={e => e.stopPropagation()}>
+        <h2 className={styles['dialog-title']}>{title}</h2>
+        <p className={styles['dialog-message']}>{message}</p>
+        <div className={styles['dialog-actions']}>
+          <button className={`${styles['dialog-button']} ${styles['dialog-button-cancel']}`} onClick={onCancel}>
             {cancelLabel}
           </button>
           <button 
-            className={`dialog-button dialog-button-confirm ${variant === 'danger' ? 'dialog-button-danger' : ''}`}
+            className={`${styles['dialog-button']} ${styles['dialog-button-confirm']} ${variant === 'danger' ? styles['dialog-button-danger'] : ''}`}
             onClick={onConfirm}
           >
             {confirmLabel}

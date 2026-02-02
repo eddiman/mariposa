@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
-import type { Settings } from '../hooks/useSettings';
+import type { Settings } from '../../hooks/useSettings';
+import styles from './SettingsDialog.module.css';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -32,25 +33,25 @@ export function SettingsDialog({
   if (!open) return null;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="settings-dialog" onClick={e => e.stopPropagation()}>
-        <div className="settings-header">
-          <h2 className="settings-title">Settings</h2>
-          <button className="settings-close" onClick={onClose} aria-label="Close">
+    <div className={styles['dialog-overlay']} onClick={onClose}>
+      <div className={styles['settings-dialog']} onClick={e => e.stopPropagation()}>
+        <div className={styles['settings-header']}>
+          <h2 className={styles['settings-title']}>Settings</h2>
+          <button className={styles['settings-close']} onClick={onClose} aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
         
-        <div className="settings-content">
-          <div className="settings-section">
-            <h3 className="settings-section-title">Canvas</h3>
+        <div className={styles['settings-content']}>
+          <div className={styles['settings-section']}>
+            <h3 className={styles['settings-section-title']}>Canvas</h3>
             
-            <label className="settings-toggle">
-              <span className="settings-toggle-label">
-                <span className="settings-toggle-title">Snap to object</span>
-                <span className="settings-toggle-description">
+            <label className={styles['settings-toggle']}>
+              <span className={styles['settings-toggle-label']}>
+                <span className={styles['settings-toggle-title']}>Snap to object</span>
+                <span className={styles['settings-toggle-description']}>
                   Automatically align items to nearby objects while dragging
                 </span>
               </span>
@@ -59,13 +60,13 @@ export function SettingsDialog({
                 checked={settings.snapToObject}
                 onChange={e => onSettingChange('snapToObject', e.target.checked)}
               />
-              <span className="settings-toggle-switch" />
+              <span className={styles['settings-toggle-switch']} />
             </label>
             
-            <label className="settings-toggle">
-              <span className="settings-toggle-label">
-                <span className="settings-toggle-title">Show snap lines</span>
-                <span className="settings-toggle-description">
+            <label className={styles['settings-toggle']}>
+              <span className={styles['settings-toggle-label']}>
+                <span className={styles['settings-toggle-title']}>Show snap lines</span>
+                <span className={styles['settings-toggle-description']}>
                   Display alignment guides when snapping to objects
                 </span>
               </span>
@@ -74,7 +75,7 @@ export function SettingsDialog({
                 checked={settings.showSnapLines}
                 onChange={e => onSettingChange('showSnapLines', e.target.checked)}
               />
-              <span className="settings-toggle-switch" />
+              <span className={styles['settings-toggle-switch']} />
             </label>
           </div>
         </div>
