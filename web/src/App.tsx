@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle } from './components/Canvas';
+import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle, type FocusOnNodeOptions } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
 import { CategoryDialog } from './components/CategoryDialog';
 import { Toolbar } from './components/Toolbar';
@@ -15,7 +15,15 @@ import { useImages } from './hooks/useImages';
 import { useCanvas } from './hooks/useCanvas';
 import { useSettings } from './hooks/useSettings';
 import { isTouchDevice } from './utils/platform.js';
-import type { Position, CategoryMeta, CanvasTool, Note } from './types';
+import { 
+  EditorProvider, 
+  useEditor, 
+  PlacementProvider, 
+  usePlacement, 
+  CategoryDialogProvider, 
+  useCategoryDialog 
+} from './contexts';
+import type { Position, CanvasTool, NoteMeta } from './types';
 import type { Node } from '@xyflow/react';
 
 function AppContent() {
@@ -24,16 +32,34 @@ function AppContent() {
     categories, 
     loadingCategories, 
     setCurrentSpace, 
-    focusedNoteSlug, 
+    focusedNoteSlug,
     setFocusedNoteSlug,
     createCategory,
+    updateCategory,
     deleteCategory,
     refetchCategories,
   } = useCanvas();
   const { settings, updateSetting } = useSettings();
   
-  // Track the origin rect for expand animation
-  const [originRect, setOriginRect] = useState<OriginRect | null>(null);
+  // Use contexts
+  const { 
+    originRect, 
+    initialNoteForEditor, 
+    prepareEditorOpen, 
+    clearEditorState,
+  } = useEditor();
+  const { isPlacementMode, isCreating, togglePlacementMode, exitPlacementMode, setIsCreating } = usePlacement();
+  const { 
+    isOpen: categoryDialogOpen, 
+    mode: categoryDialogMode, 
+    categoryToDelete, 
+    categoryToRename,
+    openCreateDialog: handleOpenCreateCategory,
+    openRenameDialog: handleRenameCategoryRequest,
+    openDeleteDialog: handleDeleteCategoryRequest,
+    closeDialog: handleCategoryDialogClose,
+  } = useCategoryDialog();
+  
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('mariposa-sidebar-open');
@@ -49,11 +75,6 @@ function AppContent() {
     });
   }, []);
   
-  // Category dialog state
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [categoryDialogMode, setCategoryDialogMode] = useState<'select' | 'create' | 'delete'>('select');
-  const [categoryToDelete, setCategoryToDelete] = useState<CategoryMeta | null>(null);
-  
   // Filter notes by current space (category)
   const notesOptions = useMemo(() => ({
     category: currentSpace || undefined,
@@ -67,20 +88,18 @@ function AppContent() {
   const { notes, loading, getNote, createNote, updateNote, updatePosition, deleteNote, duplicateNote, moveToCategory: moveNoteToCategory } = useNotes(notesOptions);
   const { images, uploadImage, duplicateImage, updateImagePosition, updateImageSize, deleteImage, moveToCategory: moveImageToCategory } = useImages(imagesOptions);
 
-  const [isCreating, setIsCreating] = useState(false);
-  
-  // Placement mode state for ghost note creation
-  const [isPlacementMode, setIsPlacementMode] = useState(false);
-  
-  // Track initial note data when opening editor (to avoid loading flash)
-  const [initialNoteForEditor, setInitialNoteForEditor] = useState<Note | null>(null);
+  // Track initial note data when opening editor (to avoid loading flash) - handled by EditorContext
   
   // Selection state for alignment toolbar
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const updateNodePositionsRef = useRef<((updates: NodePositionUpdate[]) => void) | null>(null);
+  const focusOnNodeRef = useRef<((nodeId: string, options?: FocusOnNodeOptions) => void) | null>(null);
   
   // History state for undo/redo (will be used by context menu later)
   const [_historyHandle, setHistoryHandle] = useState<CanvasHistoryHandle | null>(null);
+  
+  // Ref to update sidebar note cache when notes are edited
+  const sidebarNoteUpdateRef = useRef<((slug: string, updates: Partial<NoteMeta>) => void) | null>(null);
   
   // Tool state for mobile canvas interaction
   const [activeTool, setActiveTool] = useState<CanvasTool>('pan');
@@ -94,8 +113,16 @@ function AppContent() {
     updateNodePositionsRef.current = handler;
   }, []);
 
+  const handleFocusOnNodeRef = useCallback((handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => {
+    focusOnNodeRef.current = handler;
+  }, []);
+
   const handleHistoryChange = useCallback((handle: CanvasHistoryHandle) => {
     setHistoryHandle(handle);
+  }, []);
+
+  const handleSidebarNoteUpdateRef = useCallback((handler: (slug: string, updates: Partial<NoteMeta>) => void) => {
+    sidebarNoteUpdateRef.current = handler;
   }, []);
 
   const handleUpdateNodePositions = useCallback((updates: NodePositionUpdate[]) => {
@@ -107,17 +134,14 @@ function AppContent() {
   const handleNoteOpen = useCallback((slug: string, category: string, rect: OriginRect) => {
     // Look up the note from the existing notes array to avoid loading flash
     const existingNote = notes.find(n => n.slug === slug) || null;
-    setInitialNoteForEditor(existingNote);
-    setOriginRect(rect);
+    prepareEditorOpen(rect, existingNote);
     setFocusedNoteSlug(slug, category);
-  }, [notes, setFocusedNoteSlug]);
+  }, [notes, prepareEditorOpen, setFocusedNoteSlug]);
 
   const handleNoteClose = useCallback(() => {
     setFocusedNoteSlug(null);
-    setInitialNoteForEditor(null);
-    // Clear origin rect after close animation completes
-    setTimeout(() => setOriginRect(null), 300);
-  }, [setFocusedNoteSlug]);
+    clearEditorState();
+  }, [setFocusedNoteSlug, clearEditorState]);
 
   const handleNotePositionChange = useCallback((slug: string, position: Position) => {
     updatePosition(slug, position);
@@ -137,6 +161,10 @@ function AppContent() {
 
   const handleNoteSave = useCallback(async (slug: string, content: string, title: string, tags: string[]) => {
     await updateNote(slug, { content, title, tags });
+    // Update sidebar cache so title changes reflect immediately
+    if (sidebarNoteUpdateRef.current) {
+      sidebarNoteUpdateRef.current(slug, { title });
+    }
   }, [updateNote]);
 
   const handleNoteDelete = useCallback(async (slug: string) => {
@@ -159,16 +187,11 @@ function AppContent() {
     await duplicateImage(id, position);
   }, [duplicateImage]);
 
-  // Toggle placement mode (FAB click)
-  const handleTogglePlacementMode = useCallback(() => {
-    setIsPlacementMode(prev => !prev);
-  }, []);
-
   // Handle canvas click during placement mode - create note at position
   const handlePlacementClick = useCallback(async (position: Position) => {
     if (isCreating) return;
     setIsCreating(true);
-    setIsPlacementMode(false);
+    exitPlacementMode();
     
     const noteCategory = currentSpace || 'all-notes';
     const newNote = await createNote({
@@ -181,46 +204,25 @@ function AppContent() {
     setIsCreating(false);
     
     if (newNote) {
-      // Set initial note data to avoid loading flash
-      setInitialNoteForEditor(newNote);
       // Open the new note for editing
-      setOriginRect({
+      prepareEditorOpen({
         x: window.innerWidth / 2 - 100,
         y: window.innerHeight / 2 - 141,
         width: 200,
         height: 283,
-      });
+      }, newNote);
       setFocusedNoteSlug(newNote.slug, noteCategory);
     }
-  }, [createNote, currentSpace, isCreating, setFocusedNoteSlug]);
+  }, [createNote, currentSpace, isCreating, setIsCreating, exitPlacementMode, prepareEditorOpen, setFocusedNoteSlug]);
 
-  // Escape key to exit placement mode
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isPlacementMode) {
-        setIsPlacementMode(false);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlacementMode]);
-
-  // Sidebar handlers
-  const handleOpenCreateCategory = useCallback(() => {
-    setCategoryDialogMode('create');
-    setCategoryDialogOpen(true);
-  }, []);
-
-  const handleDeleteCategoryRequest = useCallback((category: CategoryMeta) => {
-    setCategoryToDelete(category);
-    setCategoryDialogMode('delete');
-    setCategoryDialogOpen(true);
-  }, []);
-
+  // Category handlers
   const handleCreateCategory = useCallback(async (slug: string, displayName: string) => {
     await createCategory(slug, displayName);
   }, [createCategory]);
+
+  const handleRenameCategoryConfirm = useCallback(async (slug: string, newDisplayName: string) => {
+    await updateCategory(slug, newDisplayName);
+  }, [updateCategory]);
 
   const handleDeleteCategoryConfirm = useCallback(async (slug: string, moveNotesTo?: string) => {
     await deleteCategory(slug, moveNotesTo);
@@ -230,10 +232,119 @@ function AppContent() {
     }
   }, [deleteCategory, currentSpace, setCurrentSpace]);
 
-  const handleCategoryDialogClose = useCallback(() => {
-    setCategoryDialogOpen(false);
-    setCategoryToDelete(null);
-  }, []);
+    const focusTimeDuration = 500;
+
+  // Sidebar note handlers
+  const handleSidebarNoteClick = useCallback((category: string, slug: string) => {
+    // Navigate to the category where the note lives
+    const targetCategory = category === 'uncategorized' ? null : category;
+    setCurrentSpace(targetCategory);
+    // Find the note data
+    const note = notes.find(n => n.slug === slug);
+    const noteCategory = note?.category || category;
+    
+    // Helper to open the note editor
+    const openNoteEditor = () => {
+      prepareEditorOpen({
+        x: window.innerWidth / 2 - 100,
+        y: window.innerHeight / 2 - 141,
+        width: 200,
+        height: 283,
+      }, note || null);
+      setFocusedNoteSlug(slug, noteCategory);
+    };
+    
+    // Check if a note is already open
+    if (focusedNoteSlug) {
+      // Note already open - open new note immediately, focus in background
+      openNoteEditor();
+      setTimeout(() => {
+        if (focusOnNodeRef.current) {
+          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
+        }
+      }, 100);
+    } else {
+      // No note open - just focus on canvas (pan/zoom + highlight), do NOT open
+      setTimeout(() => {
+        if (focusOnNodeRef.current) {
+          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
+        }
+      }, 100);
+    }
+  }, [setCurrentSpace, notes, focusedNoteSlug, prepareEditorOpen, setFocusedNoteSlug]);
+
+  const handleSidebarNoteEdit = useCallback((slug: string) => {
+    // Chevron click - opens the note editor
+    const note = notes.find(n => n.slug === slug);
+    const noteCategory = note?.category || currentSpace || 'uncategorized';
+    
+    // Navigate to the category where the note lives
+    const targetCategory = noteCategory === 'uncategorized' ? null : noteCategory;
+    setCurrentSpace(targetCategory);
+    
+    // Helper to open the note editor
+    const openNoteEditor = () => {
+      prepareEditorOpen({
+        x: window.innerWidth / 2 - 100,
+        y: window.innerHeight / 2 - 141,
+        width: 200,
+        height: 283,
+      }, note || null);
+      setFocusedNoteSlug(slug, noteCategory);
+    };
+    
+    // Check if a note is already open
+    if (focusedNoteSlug) {
+      // Note already open - open new note immediately, focus in background
+      openNoteEditor();
+      setTimeout(() => {
+        if (focusOnNodeRef.current) {
+          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
+        }
+      }, 100);
+    } else {
+      // No note open - focus first, then open after animation completes
+      setTimeout(() => {
+        if (focusOnNodeRef.current) {
+          focusOnNodeRef.current(slug, { zoom: 1, duration: focusTimeDuration });
+        }
+        // Open note after focus animation (800ms) + highlight animation (800ms)
+        setTimeout(() => {
+          openNoteEditor();
+        }, focusTimeDuration * 2);
+      }, 100);
+    }
+  }, [notes, prepareEditorOpen, setFocusedNoteSlug, currentSpace, setCurrentSpace, focusedNoteSlug]);
+
+  const handleSidebarAddNote = useCallback(async (category: string) => {
+    if (isCreating) return null;
+    setIsCreating(true);
+    
+    // Create note at a default center position
+    const defaultPosition: Position = { x: 0, y: 0 };
+    
+    const newNote = await createNote({
+      title: 'Untitled Note',
+      content: '',
+      category,
+      position: defaultPosition,
+    });
+    
+    setIsCreating(false);
+    
+    if (newNote) {
+      // Open the new note for editing
+      prepareEditorOpen({
+        x: window.innerWidth / 2 - 100,
+        y: window.innerHeight / 2 - 141,
+        width: 200,
+        height: 283,
+      }, newNote);
+      setFocusedNoteSlug(newNote.slug, category);
+      return newNote;
+    }
+    return null;
+  }, [createNote, isCreating, setIsCreating, prepareEditorOpen, setFocusedNoteSlug]);
 
   // Wrapper for moving notes - also refetches category counts
   const handleNoteMoveToCategory = useCallback(async (slug: string, category: string) => {
@@ -264,7 +375,12 @@ function AppContent() {
         onSpaceChange={setCurrentSpace}
         onSettingsClick={() => setSettingsOpen(true)}
         onCreateCategory={handleOpenCreateCategory}
+        onRenameCategory={handleRenameCategoryRequest}
         onDeleteCategory={handleDeleteCategoryRequest}
+        onNoteClick={handleSidebarNoteClick}
+        onNoteEdit={handleSidebarNoteEdit}
+        onAddNote={handleSidebarAddNote}
+        onNoteUpdateRef={handleSidebarNoteUpdateRef}
         loading={loadingCategories}
       />
       
@@ -289,6 +405,7 @@ function AppContent() {
           onImageMoveToCategory={handleImageMoveToCategory}
           onSelectionChange={handleSelectionChange}
           onUpdateNodePositionsRef={handleUpdateNodePositionsRef}
+          onFocusOnNodeRef={handleFocusOnNodeRef}
           onHistoryChange={handleHistoryChange}
           loading={loading}
           settings={settings}
@@ -297,7 +414,7 @@ function AppContent() {
       
       <Toolbar 
         isPlacementMode={isPlacementMode}
-        onTogglePlacementMode={handleTogglePlacementMode}
+        onTogglePlacementMode={togglePlacementMode}
       />
       
       <GhostNote visible={isPlacementMode} />
@@ -328,7 +445,9 @@ function AppContent() {
         mode={categoryDialogMode}
         categories={categories}
         categoryToDelete={categoryToDelete}
+        categoryToRename={categoryToRename}
         onCreate={handleCreateCategory}
+        onRename={handleRenameCategoryConfirm}
         onDelete={handleDeleteCategoryConfirm}
         onClose={handleCategoryDialogClose}
       />
@@ -339,6 +458,7 @@ function AppContent() {
           originRect={originRect}
           categories={categories}
           initialNote={initialNoteForEditor}
+          sidebarOpen={sidebarOpen}
           onClose={handleNoteClose}
           onSave={handleNoteSave}
           onDelete={handleNoteDelete}
@@ -350,12 +470,24 @@ function AppContent() {
   );
 }
 
+function AppWithProviders() {
+  return (
+    <PlacementProvider>
+      <CategoryDialogProvider>
+        <EditorProvider>
+          <AppContent />
+        </EditorProvider>
+      </CategoryDialogProvider>
+    </PlacementProvider>
+  );
+}
+
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<AppContent />} />
-      <Route path="/:category" element={<AppContent />} />
-      <Route path="/:category/:noteSlug" element={<AppContent />} />
+      <Route path="/" element={<AppWithProviders />} />
+      <Route path="/:category" element={<AppWithProviders />} />
+      <Route path="/:category/:noteSlug" element={<AppWithProviders />} />
     </Routes>
   );
 }
