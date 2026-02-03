@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 
+export type Theme = 'default' | 'bauhaus';
+
 export interface Settings {
   snapToObject: boolean;
   showSnapLines: boolean;
+  theme: Theme;
 }
 
 const STORAGE_KEY = 'mariposa-settings';
@@ -10,6 +13,7 @@ const STORAGE_KEY = 'mariposa-settings';
 const DEFAULT_SETTINGS: Settings = {
   snapToObject: true,
   showSnapLines: true,
+  theme: 'default',
 };
 
 function loadSettings(): Settings {

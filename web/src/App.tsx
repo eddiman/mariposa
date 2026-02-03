@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Canvas, type OriginRect, type NodePositionUpdate, type CanvasHistoryHandle } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
@@ -43,6 +43,11 @@ function AppContent() {
     refetchCategories,
   } = useCanvas();
   const { settings, updateSetting } = useSettings();
+  
+  // Apply theme to document root for CSS custom property switching
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', settings.theme);
+  }, [settings.theme]);
   
   // Use contexts
   const { 

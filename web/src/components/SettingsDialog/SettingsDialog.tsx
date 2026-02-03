@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import type { Settings } from '../../hooks/useSettings';
+import type { Settings, Theme } from '../../hooks/useSettings';
 import styles from './SettingsDialog.module.css';
 
 interface SettingsDialogProps {
@@ -45,6 +45,27 @@ export function SettingsDialog({
         </div>
         
         <div className={styles['settings-content']}>
+          <div className={styles['settings-section']}>
+            <h3 className={styles['settings-section-title']}>Appearance</h3>
+            
+            <div className={styles['settings-select']}>
+              <span className={styles['settings-select-label']}>
+                <span className={styles['settings-select-title']}>Theme</span>
+                <span className={styles['settings-select-description']}>
+                  Choose the visual style of the application
+                </span>
+              </span>
+              <select
+                value={settings.theme}
+                onChange={e => onSettingChange('theme', e.target.value as Theme)}
+                className={styles['settings-select-input']}
+              >
+                <option value="default">Default</option>
+                <option value="bauhaus">Bauhaus</option>
+              </select>
+            </div>
+          </div>
+          
           <div className={styles['settings-section']}>
             <h3 className={styles['settings-section-title']}>Canvas</h3>
             

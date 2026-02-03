@@ -2,13 +2,13 @@
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  z-index: 300;
+  background: var(--color-overlay);
+  backdrop-filter: blur(0.25rem);
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: dialogFadeIn 0.15s ease;
+  animation: dialogFadeIn var(--transition-fast);
 }
 
 @keyframes dialogFadeIn {
@@ -19,20 +19,20 @@
 .settings-dialog {
   background: var(--color-card);
   border-radius: var(--radius);
-  width: 400px;
+  width: var(--dialog-width);
   max-width: 90vw;
   max-height: 80vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-overlay);
-  animation: dialogSlideIn 0.15s ease;
+  animation: dialogSlideIn var(--transition-fast);
 }
 
 @keyframes dialogSlideIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-10px);
+    transform: scale(0.95) translateY(-0.625rem);
   }
   to {
     opacity: 1;
@@ -44,13 +44,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacing-4) var(--spacing-5);
+  border-bottom: 0.0625rem solid var(--color-border);
 }
 
 .settings-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   margin: 0;
   color: var(--color-text);
 }
@@ -59,28 +59,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--icon-button-sm);
+  height: var(--icon-button-sm);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .settings-close:hover {
-  background: #f0f0f0;
+  background: var(--color-hover-bg);
   color: var(--color-text);
 }
 
 .settings-content {
-  padding: 20px;
+  padding: var(--spacing-5);
   overflow-y: auto;
 }
 
 .settings-section {
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-6);
 }
 
 .settings-section:last-child {
@@ -88,21 +88,21 @@
 }
 
 .settings-section-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03125rem;
   color: var(--color-text-secondary);
-  margin: 0 0 12px;
+  margin: 0 0 var(--spacing-3);
 }
 
 .settings-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) 0;
+  border-bottom: 0.0625rem solid var(--color-border);
   cursor: pointer;
 }
 
@@ -120,41 +120,41 @@
 .settings-toggle-label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .settings-toggle-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text);
 }
 
 .settings-toggle-description {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
 }
 
 .settings-toggle-switch {
   position: relative;
-  width: 44px;
-  height: 24px;
-  background: #ddd;
-  border-radius: 12px;
-  transition: background 0.2s ease;
+  width: 2.75rem;
+  height: 1.5rem;
+  background: var(--color-border);
+  border-radius: 0.75rem;
+  transition: background var(--transition-normal);
   flex-shrink: 0;
 }
 
 .settings-toggle-switch::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: white;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  transition: transform 0.2s ease;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: var(--color-white);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0.0625rem 0.1875rem rgba(0,0,0,0.2);
+  transition: transform var(--transition-normal);
 }
 
 .settings-toggle input:checked + .settings-toggle-switch {
@@ -162,20 +162,73 @@
 }
 
 .settings-toggle input:checked + .settings-toggle-switch::after {
-  transform: translateX(20px);
+  transform: translateX(1.25rem);
+}
+
+/* === Select Input (Theme Selector) === */
+.settings-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) 0;
+  border-bottom: 0.0625rem solid var(--color-border);
+}
+
+.settings-select:last-child {
+  border-bottom: none;
+}
+
+.settings-select-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-0-5);
+}
+
+.settings-select-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.settings-select-description {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.settings-select-input {
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  font-family: var(--font-body);
+  cursor: pointer;
+  min-width: 8rem;
+  transition: border-color var(--transition-fast);
+}
+
+.settings-select-input:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.settings-select-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 /* === Mobile Responsive === */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .settings-dialog {
-    width: calc(100vw - 32px);
+    width: calc(100vw - var(--spacing-8));
     max-width: none;
-    max-height: calc(100vh - 2rem - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
+    max-height: calc(100vh - var(--spacing-8) - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
   }
   
   .settings-close {
-    width: 44px;
-    height: 44px;
+    width: var(--touch-target);
+    height: var(--touch-target);
   }
 }
 
@@ -186,7 +239,7 @@
   }
   
   .settings-toggle:active {
-    background: #f5f5f5;
+    background: var(--color-bg);
   }
   
   .settings-close:hover {
@@ -195,7 +248,7 @@
   }
   
   .settings-close:active {
-    background: #e0e0e0;
+    background: var(--color-active-bg);
     color: var(--color-text);
   }
 }
