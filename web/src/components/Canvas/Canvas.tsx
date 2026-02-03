@@ -644,13 +644,14 @@ function CanvasInner({
   }, [onNodesChange, onNotePositionChange, onImagePositionChange, nodes, isTouch, activeTool, nodeDrag.shiftKeyRef]);
 
   // Handle pane click
-  const handlePaneClick = useCallback(() => {
+  const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (isPlacementMode && onPlacementClick) {
-      // handled by onPaneClick event
+      const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      onPlacementClick(flowPosition);
       return;
     }
     clearSelection();
-  }, [isPlacementMode, onPlacementClick, clearSelection]);
+  }, [isPlacementMode, onPlacementClick, screenToFlowPosition, clearSelection]);
 
   // Handle node context menu
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node<CanvasNodeData>) => {
