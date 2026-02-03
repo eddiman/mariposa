@@ -474,6 +474,8 @@ function CanvasInner({
     historyPush: history.push,
     onNotePositionChange,
     onImagePositionChange,
+    onSectionPositionChange,
+    onStickyPositionChange,
   });
 
   // Keyboard shortcuts

@@ -16,6 +16,35 @@ interface UseCanvasNodeDragProps<T extends Record<string, unknown>> {
   historyPush: (action: HistoryAction) => void;
   onNotePositionChange: (slug: string, position: Position) => void;
   onImagePositionChange: (id: string, position: Position) => void;
+  onSectionPositionChange: (slug: string, position: Position) => void;
+  onStickyPositionChange: (slug: string, position: Position) => void;
+}
+
+// Helper to check if a node is inside a section's bounds
+function isNodeInsideSection<T extends Record<string, unknown>>(
+  node: Node<T>,
+  section: Node<T>
+): boolean {
+  // Don't include sections or the section itself
+  if (node.type === 'section' || node.id === section.id) return false;
+
+  const sectionData = section.data as { width?: number; height?: number };
+  const sectionWidth = sectionData.width || 300;
+  const sectionHeight = sectionData.height || 200;
+
+  const nodeWidth = node.measured?.width ?? (node.type === 'note' ? 200 : node.type === 'sticky' ? 150 : 300);
+  const nodeHeight = node.measured?.height ?? (node.type === 'note' ? 283 : node.type === 'sticky' ? 150 : 200);
+
+  // Check if node center is inside section bounds
+  const nodeCenterX = node.position.x + nodeWidth / 2;
+  const nodeCenterY = node.position.y + nodeHeight / 2;
+
+  return (
+    nodeCenterX >= section.position.x &&
+    nodeCenterX <= section.position.x + sectionWidth &&
+    nodeCenterY >= section.position.y &&
+    nodeCenterY <= section.position.y + sectionHeight
+  );
 }
 
 export function useCanvasNodeDrag<T extends Record<string, unknown>>({
@@ -30,9 +59,17 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
   historyPush,
   onNotePositionChange,
   onImagePositionChange,
+  onSectionPositionChange,
+  onStickyPositionChange,
 }: UseCanvasNodeDragProps<T>) {
   const shiftKeyRef = useRef(false);
   const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Track nodes contained within a dragged section
+  const containedNodesRef = useRef<Set<string>>(new Set());
+  // Track the section being dragged (if any)
+  const draggedSectionRef = useRef<string | null>(null);
+  // Track last position for delta calculation during drag
+  const lastSectionPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Handle node drag start - capture initial positions for history and auto-select
   const handleNodeDragStart = useCallback((_event: React.MouseEvent, node: Node<T>, draggedNodes: Node<T>[]) => {
@@ -53,11 +90,56 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
     for (const n of draggedNodes) {
       dragStartPositionsRef.current.set(n.id, { x: n.position.x, y: n.position.y });
     }
-  }, [setNodes, isTouch, activeTool]);
 
-  // Handle node drag for snap-to-guides
+    // Check if we're dragging a section - if so, find contained nodes
+    containedNodesRef.current.clear();
+    draggedSectionRef.current = null;
+    lastSectionPositionRef.current = null;
+
+    const draggedSection = draggedNodes.find(n => n.type === 'section');
+    if (draggedSection && draggedNodes.length === 1) {
+      // Only do grouped movement when dragging a single section
+      draggedSectionRef.current = draggedSection.id;
+      lastSectionPositionRef.current = { x: draggedSection.position.x, y: draggedSection.position.y };
+
+      const allNodes = getNodes();
+      for (const n of allNodes) {
+        if (isNodeInsideSection(n, draggedSection)) {
+          containedNodesRef.current.add(n.id);
+          // Also capture start positions for contained nodes
+          dragStartPositionsRef.current.set(n.id, { x: n.position.x, y: n.position.y });
+        }
+      }
+    }
+  }, [setNodes, isTouch, activeTool, getNodes]);
+
+  // Handle node drag for snap-to-guides and section grouped movement
   const handleNodeDrag = useCallback((_event: React.MouseEvent, node: Node<T>) => {
     if (isTouch && activeTool === 'pan') return;
+
+    // If dragging a section with contained nodes, move them along
+    if (draggedSectionRef.current === node.id && containedNodesRef.current.size > 0 && lastSectionPositionRef.current) {
+      const dx = node.position.x - lastSectionPositionRef.current.x;
+      const dy = node.position.y - lastSectionPositionRef.current.y;
+
+      if (dx !== 0 || dy !== 0) {
+        setNodes(currentNodes =>
+          currentNodes.map(n => {
+            if (containedNodesRef.current.has(n.id)) {
+              return {
+                ...n,
+                position: {
+                  x: n.position.x + dx,
+                  y: n.position.y + dy,
+                },
+              };
+            }
+            return n;
+          })
+        );
+        lastSectionPositionRef.current = { x: node.position.x, y: node.position.y };
+      }
+    }
 
     if (!settings.snapToObject) {
       clearGuides();
@@ -84,17 +166,28 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
   const handleNodeDragStop = useCallback((_event: React.MouseEvent, _node: Node<T>, draggedNodes: Node<T>[]) => {
     if (isTouch && activeTool === 'pan') return;
 
+    // Get current node positions for contained nodes (they may have moved)
+    const allNodes = getNodes();
+    const nodePositionMap = new Map(allNodes.map(n => [n.id, n.position]));
+
     // Build history action from captured start positions
     if (dragStartPositionsRef.current.size > 0) {
       const beforeSnapshots: NodeSnapshot[] = [];
       const afterSnapshots: NodeSnapshot[] = [];
 
-      for (const n of draggedNodes) {
-        const startPos = dragStartPositionsRef.current.get(n.id);
-        if (startPos) {
-          if (startPos.x !== n.position.x || startPos.y !== n.position.y) {
-            beforeSnapshots.push({ id: n.id, position: startPos });
-            afterSnapshots.push({ id: n.id, position: { x: n.position.x, y: n.position.y } });
+      // Include both dragged nodes and contained nodes in history
+      const allAffectedNodeIds = new Set([
+        ...draggedNodes.map(n => n.id),
+        ...containedNodesRef.current,
+      ]);
+
+      for (const nodeId of allAffectedNodeIds) {
+        const startPos = dragStartPositionsRef.current.get(nodeId);
+        const currentPos = nodePositionMap.get(nodeId);
+        if (startPos && currentPos) {
+          if (startPos.x !== currentPos.x || startPos.y !== currentPos.y) {
+            beforeSnapshots.push({ id: nodeId, position: startPos });
+            afterSnapshots.push({ id: nodeId, position: { x: currentPos.x, y: currentPos.y } });
           }
         }
       }
@@ -111,18 +204,37 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
       dragStartPositionsRef.current.clear();
     }
 
-    // Persist the final positions
-    for (const n of draggedNodes) {
-      if (n.id.startsWith('image-')) {
-        const imageId = n.id.replace('image-', '');
-        onImagePositionChange(imageId, n.position);
+    // Persist the final positions for all affected nodes
+    const nodesToPersist = new Set([
+      ...draggedNodes.map(n => n.id),
+      ...containedNodesRef.current,
+    ]);
+
+    for (const nodeId of nodesToPersist) {
+      const position = nodePositionMap.get(nodeId);
+      if (!position) continue;
+
+      if (nodeId.startsWith('image-')) {
+        const imageId = nodeId.replace('image-', '');
+        onImagePositionChange(imageId, position);
+      } else if (nodeId.startsWith('section-')) {
+        const sectionSlug = nodeId.replace('section-', '');
+        onSectionPositionChange(sectionSlug, position);
+      } else if (nodeId.startsWith('sticky-')) {
+        const stickySlug = nodeId.replace('sticky-', '');
+        onStickyPositionChange(stickySlug, position);
       } else {
-        onNotePositionChange(n.id, n.position);
+        onNotePositionChange(nodeId, position);
       }
     }
 
+    // Clear section drag tracking
+    containedNodesRef.current.clear();
+    draggedSectionRef.current = null;
+    lastSectionPositionRef.current = null;
+
     clearGuides();
-  }, [onNotePositionChange, onImagePositionChange, clearGuides, historyPush, isTouch, activeTool]);
+  }, [getNodes, onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange, clearGuides, historyPush, isTouch, activeTool]);
 
   return {
     shiftKeyRef,
