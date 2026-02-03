@@ -81,3 +81,71 @@ export interface ImagesResponse {
   images: CanvasImage[];
   total: number;
 }
+
+// Section types
+export interface Section {
+  slug: string;
+  name: string;
+  width: number;
+  height: number;
+  color?: string;
+  position?: Position;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SectionCreateInput {
+  name?: string;
+  width?: number;
+  height?: number;
+  color?: string;
+  position?: Position;
+  category?: string;
+}
+
+export interface SectionUpdateInput {
+  name?: string;
+  width?: number;
+  height?: number;
+  color?: string;
+  position?: Position;
+  category?: string;
+}
+
+export interface SectionsResponse {
+  sections: Section[];
+  total: number;
+}
+
+// Sticky note types
+export type StickyColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'mint' | 'peach';
+
+export interface Sticky {
+  slug: string;
+  text: string;
+  color: StickyColor;
+  position?: Position;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StickyCreateInput {
+  text?: string;
+  color?: StickyColor;
+  position?: Position;
+  category?: string;
+}
+
+export interface StickyUpdateInput {
+  text?: string;
+  color?: StickyColor;
+  position?: Position;
+  category?: string;
+}
+
+export interface StickiesResponse {
+  stickies: Sticky[];
+  total: number;
+}

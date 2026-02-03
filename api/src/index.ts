@@ -7,6 +7,8 @@ import categoriesRouter from './routes/categories.js';
 import tagsRouter from './routes/tags.js';
 import mcpRouter from './routes/mcp.js';
 import assetsRouter from './routes/assets.js';
+import sectionsRouter from './routes/sections.js';
+import stickiesRouter from './routes/stickies.js';
 
 const app = express();
 
@@ -39,6 +41,8 @@ app.use('/api/notes', notesRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/assets', assetsRouter);
+app.use('/api/sections', sectionsRouter);
+app.use('/api/stickies', stickiesRouter);
 
 // MCP Streamable HTTP endpoint
 app.use('/mcp', mcpRouter);
@@ -82,6 +86,14 @@ async function start() {
       console.log('  POST   /api/assets/upload  - Upload image');
       console.log('  GET    /api/assets/:file   - Get image file');
       console.log('  DELETE /api/assets/:id     - Delete image');
+      console.log('  GET    /api/sections       - List sections');
+      console.log('  POST   /api/sections       - Create section');
+      console.log('  PUT    /api/sections/:slug - Update section');
+      console.log('  DELETE /api/sections/:slug - Delete section');
+      console.log('  GET    /api/stickies       - List stickies');
+      console.log('  POST   /api/stickies       - Create sticky');
+      console.log('  PUT    /api/stickies/:slug - Update sticky');
+      console.log('  DELETE /api/stickies/:slug - Delete sticky');
       console.log('  GET    /health             - Health check');
       console.log('\nMCP Streamable HTTP endpoint:');
       console.log('  POST   /mcp                - MCP JSON-RPC requests');

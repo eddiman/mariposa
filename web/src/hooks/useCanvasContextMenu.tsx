@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Node } from '@xyflow/react';
-import type { Position, CategoryMeta } from '../types';
+import type { Position, CategoryMeta, StickyColor } from '../types';
 import type { ContextMenuItem } from '../components/ContextMenu';
 
 interface ContextMenuState {
@@ -22,9 +22,12 @@ interface UseCanvasContextMenuProps {
   handlePasteNodes: () => void;
   handleAddImage: () => void;
   onPlacementClick?: (position: Position) => void;
+  onAddSection?: (position: Position) => void;
+  onAddSticky?: (position: Position) => void;
+  onStickyColorChange?: (slug: string, color: StickyColor) => void;
   onNoteMoveToCategory?: (slug: string, category: string) => Promise<unknown>;
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
-  onDeleteRequest: (noteSlugs: string[], imageIds: string[]) => void;
+  onDeleteRequest: (noteSlugs: string[], imageIds: string[], sectionSlugs?: string[], stickySlugs?: string[]) => void;
 }
 
 export function useCanvasContextMenu({
@@ -39,6 +42,9 @@ export function useCanvasContextMenu({
   handlePasteNodes,
   handleAddImage,
   onPlacementClick,
+  onAddSection,
+  onAddSticky,
+  onStickyColorChange,
   onNoteMoveToCategory,
   onImageMoveToCategory,
   onDeleteRequest,
@@ -83,6 +89,35 @@ export function useCanvasContextMenu({
           onClick: () => {
             if (onPlacementClick) {
               onPlacementClick(contextMenuPositionRef.current);
+            }
+          },
+        },
+        {
+          label: 'Add Sticky',
+          shortcut: 'T',
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M8 8h8M8 12h6" />
+            </svg>
+          ),
+          onClick: () => {
+            if (onAddSticky) {
+              onAddSticky(contextMenuPositionRef.current);
+            }
+          },
+        },
+        {
+          label: 'Add Section',
+          shortcut: 'S',
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 2" />
+            </svg>
+          ),
+          onClick: () => {
+            if (onAddSection) {
+              onAddSection(contextMenuPositionRef.current);
             }
           },
         },
@@ -141,10 +176,13 @@ export function useCanvasContextMenu({
       const selectedNodes = nodes.filter(n => n.selected);
       const selectedNotes = selectedNodes.filter(n => n.type === 'note');
       const selectedImages = selectedNodes.filter(n => n.type === 'image');
+      const selectedSections = selectedNodes.filter(n => n.type === 'section');
+      const selectedStickies = selectedNodes.filter(n => n.type === 'sticky');
       const hasSelection = selectedNodes.length > 0;
       const selectionLabel = selectedNodes.length === 1 ? 'item' : `${selectedNodes.length} items`;
 
-      // Build "Move to" submenu items
+      // Build "Move to" submenu items (only for notes and images)
+      const canMoveToCategory = selectedNotes.length > 0 || selectedImages.length > 0;
       const moveToItems: ContextMenuItem[] = [
         {
           label: 'Uncategorized',
@@ -172,7 +210,28 @@ export function useCanvasContextMenu({
         })),
       ];
 
-      return [
+      // Build "Change Color" submenu for stickies
+      const stickyColors: { label: string; value: StickyColor }[] = [
+        { label: 'Yellow', value: 'yellow' },
+        { label: 'Pink', value: 'pink' },
+        { label: 'Blue', value: 'blue' },
+        { label: 'Green', value: 'green' },
+        { label: 'Purple', value: 'purple' },
+        { label: 'Orange', value: 'orange' },
+        { label: 'Mint', value: 'mint' },
+        { label: 'Peach', value: 'peach' },
+      ];
+      const colorItems: ContextMenuItem[] = stickyColors.map(({ label, value }) => ({
+        label,
+        onClick: () => {
+          for (const n of selectedStickies) {
+            const stickySlug = n.id.replace('sticky-', '');
+            if (onStickyColorChange) onStickyColorChange(stickySlug, value);
+          }
+        },
+      }));
+
+      const menuItems: ContextMenuItem[] = [
         {
           label: 'Copy',
           shortcut: `${modKey}C`,
@@ -185,18 +244,46 @@ export function useCanvasContextMenu({
           onClick: handleCopyNodes,
           disabled: !hasSelection,
         },
-        { label: '', onClick: () => {}, divider: true },
-        {
-          label: 'Move to',
-          icon: (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-            </svg>
-          ),
-          onClick: () => {},
-          disabled: !hasSelection || categories.length === 0,
-          submenu: moveToItems,
-        },
+      ];
+
+      // Add "Move to" only if notes or images are selected
+      if (canMoveToCategory) {
+        menuItems.push(
+          { label: '', onClick: () => {}, divider: true },
+          {
+            label: 'Move to',
+            icon: (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+              </svg>
+            ),
+            onClick: () => {},
+            disabled: categories.length === 0,
+            submenu: moveToItems,
+          }
+        );
+      }
+
+      // Add "Change Color" only if stickies are selected
+      if (selectedStickies.length > 0 && onStickyColorChange) {
+        menuItems.push(
+          { label: '', onClick: () => {}, divider: true },
+          {
+            label: 'Change Color',
+            icon: (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 2a10 10 0 0110 10" />
+              </svg>
+            ),
+            onClick: () => {},
+            submenu: colorItems,
+          }
+        );
+      }
+
+      // Add delete
+      menuItems.push(
         { label: '', onClick: () => {}, divider: true },
         {
           label: `Delete ${selectionLabel}`,
@@ -209,16 +296,20 @@ export function useCanvasContextMenu({
           onClick: () => {
             const noteSlugs = selectedNotes.map(n => n.id);
             const imageIds = selectedImages.map(n => n.id.replace('image-', ''));
-            if (noteSlugs.length > 0 || imageIds.length > 0) {
-              onDeleteRequest(noteSlugs, imageIds);
+            const sectionSlugs = selectedSections.map(n => n.id.replace('section-', ''));
+            const stickySlugs = selectedStickies.map(n => n.id.replace('sticky-', ''));
+            if (noteSlugs.length > 0 || imageIds.length > 0 || sectionSlugs.length > 0 || stickySlugs.length > 0) {
+              onDeleteRequest(noteSlugs, imageIds, sectionSlugs, stickySlugs);
             }
           },
           disabled: !hasSelection,
           danger: true,
-        },
-      ];
+        }
+      );
+
+      return menuItems;
     }
-  }, [contextMenu, canUndo, canRedo, handleUndo, handleRedo, handleCopyNodes, handlePasteNodes, handleAddImage, nodes, categories, onNoteMoveToCategory, onImageMoveToCategory, onPlacementClick, onDeleteRequest]);
+  }, [contextMenu, canUndo, canRedo, handleUndo, handleRedo, handleCopyNodes, handlePasteNodes, handleAddImage, nodes, categories, onNoteMoveToCategory, onImageMoveToCategory, onPlacementClick, onAddSection, onAddSticky, onStickyColorChange, onDeleteRequest]);
 
   return {
     contextMenu,

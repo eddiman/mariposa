@@ -14,6 +14,8 @@ const SettingsDialog = lazy(() => import('./components/SettingsDialog/SettingsDi
 const CategoryDialog = lazy(() => import('./components/CategoryDialog/CategoryDialog'));
 import { useNotes } from './hooks/useNotes';
 import { useImages } from './hooks/useImages';
+import { useSections } from './hooks/useSections';
+import { useStickies } from './hooks/useStickies';
 import { useCanvas } from './hooks/useCanvas';
 import { useSettings } from './hooks/useSettings';
 import { useSidebarNotes } from './hooks/useSidebarNotes';
@@ -26,7 +28,7 @@ import {
   CategoryDialogProvider, 
   useCategoryDialog 
 } from './contexts';
-import type { Position, CanvasTool, NoteMeta } from './types';
+import type { Position, CanvasTool, NoteMeta, StickyColor } from './types';
 import type { Node } from '@xyflow/react';
 
 function AppContent() {
@@ -93,8 +95,34 @@ function AppContent() {
     category: currentSpace || undefined,
   }), [currentSpace]);
   
+  // Filter sections by current space (category)
+  const sectionsOptions = useMemo(() => ({
+    category: currentSpace || undefined,
+  }), [currentSpace]);
+  
+  // Filter stickies by current space (category)
+  const stickiesOptions = useMemo(() => ({
+    category: currentSpace || undefined,
+  }), [currentSpace]);
+  
   const { notes, loading, getNote, createNote, updateNote, updatePosition, deleteNote, duplicateNote, moveToCategory: moveNoteToCategory } = useNotes(notesOptions);
   const { images, uploadImage, duplicateImage, updateImagePosition, updateImageSize, deleteImage, moveToCategory: moveImageToCategory } = useImages(imagesOptions);
+  const { 
+    sections, 
+    createSection, 
+    updateSection, 
+    updatePosition: updateSectionPosition, 
+    updateSize: updateSectionSize, 
+    deleteSection,
+  } = useSections(sectionsOptions);
+  const { 
+    stickies, 
+    createSticky, 
+    updatePosition: updateStickyPosition, 
+    updateText: updateStickyText, 
+    updateColor: updateStickyColor, 
+    deleteSticky,
+  } = useStickies(stickiesOptions);
 
   // Sidebar notes hook
   const {
@@ -206,6 +234,50 @@ function AppContent() {
     await duplicateImage(id, position);
   }, [duplicateImage]);
 
+  // Section handlers
+  const handleSectionCreate = useCallback(async (position: Position) => {
+    const category = currentSpace || 'all-notes';
+    await createSection({ position, category });
+  }, [createSection, currentSpace]);
+
+  const handleSectionPositionChange = useCallback((slug: string, position: Position) => {
+    updateSectionPosition(slug, position);
+  }, [updateSectionPosition]);
+
+  const handleSectionResize = useCallback((slug: string, width: number, height: number) => {
+    updateSectionSize(slug, width, height);
+  }, [updateSectionSize]);
+
+  const handleSectionRename = useCallback((slug: string, name: string) => {
+    updateSection(slug, { name });
+  }, [updateSection]);
+
+  const handleSectionsDelete = useCallback(async (slugs: string[]) => {
+    await Promise.all(slugs.map(slug => deleteSection(slug)));
+  }, [deleteSection]);
+
+  // Sticky handlers
+  const handleStickyCreate = useCallback(async (position: Position) => {
+    const category = currentSpace || 'all-notes';
+    await createSticky({ position, category });
+  }, [createSticky, currentSpace]);
+
+  const handleStickyPositionChange = useCallback((slug: string, position: Position) => {
+    updateStickyPosition(slug, position);
+  }, [updateStickyPosition]);
+
+  const handleStickyTextChange = useCallback((slug: string, text: string) => {
+    updateStickyText(slug, text);
+  }, [updateStickyText]);
+
+  const handleStickyColorChange = useCallback((slug: string, color: StickyColor) => {
+    updateStickyColor(slug, color);
+  }, [updateStickyColor]);
+
+  const handleStickiesDelete = useCallback(async (slugs: string[]) => {
+    await Promise.all(slugs.map(slug => deleteSticky(slug)));
+  }, [deleteSticky]);
+
   // Handle canvas click during placement mode - create note at position
   const handlePlacementClick = useCallback(async (position: Position) => {
     if (isCreating) return;
@@ -291,6 +363,8 @@ function AppContent() {
         <Canvas
           notes={notes}
           images={images}
+          sections={sections}
+          stickies={stickies}
           categories={categories}
           activeTool={activeTool}
           isPlacementMode={isPlacementMode}
@@ -306,6 +380,16 @@ function AppContent() {
           onImageDuplicate={handleImageDuplicate}
           onNoteMoveToCategory={handleNoteMoveToCategory}
           onImageMoveToCategory={handleImageMoveToCategory}
+          onSectionCreate={handleSectionCreate}
+          onSectionPositionChange={handleSectionPositionChange}
+          onSectionResize={handleSectionResize}
+          onSectionRename={handleSectionRename}
+          onSectionsDelete={handleSectionsDelete}
+          onStickyCreate={handleStickyCreate}
+          onStickyPositionChange={handleStickyPositionChange}
+          onStickyTextChange={handleStickyTextChange}
+          onStickyColorChange={handleStickyColorChange}
+          onStickiesDelete={handleStickiesDelete}
           onSelectionChange={handleSelectionChange}
           onUpdateNodePositionsRef={handleUpdateNodePositionsRef}
           onFocusOnNodeRef={handleFocusOnNodeRef}

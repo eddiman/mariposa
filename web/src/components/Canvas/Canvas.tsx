@@ -15,6 +15,8 @@ import '@xyflow/react/dist/style.css';
 
 import { NoteNode, type NoteNodeData, type OriginRect } from '../nodes/NoteNode';
 import { ImageNode, type ImageNodeData } from '../nodes/ImageNode';
+import { SectionNode, type SectionNodeData } from '../nodes/SectionNode';
+import { StickyNode, type StickyNodeData } from '../nodes/StickyNode';
 import { Dialog } from '../Dialog';
 import { SnapGuides } from '../SnapGuides';
 import { AdaptiveBackground } from '../AdaptiveBackground';
@@ -27,11 +29,11 @@ import { useCanvasTouchGestures } from '../../hooks/useCanvasTouchGestures';
 import { useCanvasNodeDrag } from '../../hooks/useCanvasNodeDrag';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { isTouchDevice } from '../../utils/platform.js';
-import type { Note, Position, CanvasImage, CategoryMeta, CanvasTool } from '../../types';
+import type { Note, Position, CanvasImage, CategoryMeta, CanvasTool, Section, Sticky, StickyColor } from '../../types';
 import type { Settings } from '../../hooks/useSettings';
 import styles from './Canvas.module.css';
 
-type CanvasNodeData = NoteNodeData | ImageNodeData;
+type CanvasNodeData = NoteNodeData | ImageNodeData | SectionNodeData | StickyNodeData;
 
 export type { OriginRect };
 
@@ -50,6 +52,8 @@ export interface FocusOnNodeOptions {
 interface CanvasProps {
   notes: Note[];
   images: CanvasImage[];
+  sections: Section[];
+  stickies: Sticky[];
   categories: CategoryMeta[];
   activeTool?: CanvasTool;
   isPlacementMode?: boolean;
@@ -65,6 +69,18 @@ interface CanvasProps {
   onImageDuplicate: (id: string, position: Position) => Promise<void>;
   onNoteMoveToCategory?: (slug: string, category: string) => Promise<Note | null>;
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
+  // Section handlers
+  onSectionCreate?: (position: Position) => void;
+  onSectionPositionChange: (slug: string, position: Position) => void;
+  onSectionResize: (slug: string, width: number, height: number) => void;
+  onSectionRename: (slug: string, name: string) => void;
+  onSectionsDelete?: (slugs: string[]) => Promise<void>;
+  // Sticky handlers
+  onStickyCreate?: (position: Position) => void;
+  onStickyPositionChange: (slug: string, position: Position) => void;
+  onStickyTextChange: (slug: string, text: string) => void;
+  onStickyColorChange?: (slug: string, color: StickyColor) => void;
+  onStickiesDelete?: (slugs: string[]) => Promise<void>;
   onSelectionChange?: (selectedNodes: Node<CanvasNodeData>[]) => void;
   onUpdateNodePositionsRef?: (handler: (updates: NodePositionUpdate[]) => void) => void;
   onFocusOnNodeRef?: (handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => void;
@@ -82,6 +98,8 @@ export interface NodePositionUpdate {
 const nodeTypes: NodeTypes = {
   note: NoteNode,
   image: ImageNode,
+  section: SectionNode,
+  sticky: StickyNode,
 };
 
 function getDefaultPosition(index: number): Position {
@@ -108,6 +126,8 @@ export function Canvas(props: CanvasProps) {
 function CanvasInner({
   notes,
   images,
+  sections,
+  stickies,
   categories,
   activeTool = 'select',
   isPlacementMode = false,
@@ -123,6 +143,16 @@ function CanvasInner({
   onImageDuplicate,
   onNoteMoveToCategory,
   onImageMoveToCategory,
+  onSectionCreate,
+  onSectionPositionChange,
+  onSectionResize,
+  onSectionRename,
+  onSectionsDelete,
+  onStickyCreate,
+  onStickyPositionChange,
+  onStickyTextChange,
+  onStickyColorChange,
+  onStickiesDelete,
   onSelectionChange,
   onUpdateNodePositionsRef,
   onFocusOnNodeRef,
@@ -137,6 +167,8 @@ function CanvasInner({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [notesToDelete, setNotesToDelete] = useState<string[]>([]);
   const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
+  const [sectionsToDelete, setSectionsToDelete] = useState<string[]>([]);
+  const [stickiesToDelete, setStickiesToDelete] = useState<string[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [pasteInputPosition, setPasteInputPosition] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
@@ -147,9 +179,11 @@ function CanvasInner({
   const isTouch = useMemo(() => isTouchDevice(), []);
 
   // Delete request handler
-  const handleDeleteRequest = useCallback((noteSlugs: string[], imageIds: string[]) => {
+  const handleDeleteRequest = useCallback((noteSlugs: string[], imageIds: string[], sectionSlugs?: string[], stickySlugs?: string[]) => {
     setNotesToDelete(noteSlugs);
     setImagesToDelete(imageIds);
+    setSectionsToDelete(sectionSlugs || []);
+    setStickiesToDelete(stickySlugs || []);
     setDeleteDialogOpen(true);
   }, []);
 
@@ -178,11 +212,17 @@ function CanvasInner({
       if (snapshot.id.startsWith('image-')) {
         const imageId = snapshot.id.replace('image-', '');
         onImagePositionChange(imageId, snapshot.position);
+      } else if (snapshot.id.startsWith('section-')) {
+        const sectionSlug = snapshot.id.replace('section-', '');
+        onSectionPositionChange(sectionSlug, snapshot.position);
+      } else if (snapshot.id.startsWith('sticky-')) {
+        const stickySlug = snapshot.id.replace('sticky-', '');
+        onStickyPositionChange(stickySlug, snapshot.position);
       } else {
         onNotePositionChange(snapshot.id, snapshot.position);
       }
     }
-  }, [onNotePositionChange, onImagePositionChange]);
+  }, [onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange]);
 
   const handleUndo = useCallback(() => {
     const action = history.undo();
@@ -210,9 +250,25 @@ function CanvasInner({
     }
   }, [onImagePaste, clipboard.contextMenuPositionRef]);
 
-  // Convert notes and images to React Flow nodes
+  // Convert notes, images, sections, and stickies to React Flow nodes
   const initialNodes: Node<CanvasNodeData>[] = useMemo(() => {
     const isPanMode = isTouch && activeTool === 'pan';
+
+    // Sections render first (behind everything else)
+    const sectionNodes: Node<SectionNodeData>[] = sections.map((section, index) => ({
+      id: `section-${section.slug}`,
+      type: 'section',
+      position: section.position || getDefaultPosition(index),
+      data: {
+        ...section,
+        onResize: onSectionResize,
+        onRename: onSectionRename,
+        isPanMode,
+      },
+      draggable: !isPanMode,
+      selected: false,
+      zIndex: -1, // Ensure sections are behind other nodes
+    }));
 
     const noteNodes: Node<NoteNodeData>[] = notes.map((note, index) => {
       const categoryMeta = categories.find(c => c.name === note.category);
@@ -248,14 +304,30 @@ function CanvasInner({
       selected: false,
     }));
 
-    return [...noteNodes, ...imageNodes];
-  }, [notes, images, categories, onNoteOpen, onImageResize, isTouch, activeTool]);
+    const stickyNodes: Node<StickyNodeData>[] = stickies.map((sticky, index) => ({
+      id: `sticky-${sticky.slug}`,
+      type: 'sticky',
+      position: sticky.position || getDefaultPosition(notes.length + images.length + index),
+      data: {
+        ...sticky,
+        onTextChange: onStickyTextChange,
+        isPanMode,
+      },
+      draggable: !isPanMode,
+      selected: false,
+    }));
+
+    // Sections first (behind), then notes, images, stickies
+    return [...sectionNodes, ...noteNodes, ...imageNodes, ...stickyNodes];
+  }, [notes, images, sections, stickies, categories, onNoteOpen, onImageResize, onSectionResize, onSectionRename, onStickyTextChange, isTouch, activeTool]);
 
   const nodeStructureKey = useMemo(() => {
     const noteKey = notes.map(n => `${n.slug}:${n.category}`).join('|');
     const imageKey = images.map(i => `${i.id}:${i.displayWidth}:${i.status}`).join('|');
-    return `${noteKey}::${imageKey}`;
-  }, [notes, images]);
+    const sectionKey = sections.map(s => `${s.slug}:${s.width}:${s.height}`).join('|');
+    const stickyKey = stickies.map(s => `${s.slug}:${s.color}`).join('|');
+    return `${noteKey}::${imageKey}::${sectionKey}::${stickyKey}`;
+  }, [notes, images, sections, stickies]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 
@@ -333,6 +405,14 @@ function CanvasInner({
     return nodes.filter(n => n.selected && n.type === 'image').map(n => n.id.replace('image-', ''));
   }, [nodes]);
 
+  const getSelectedSectionSlugs = useCallback(() => {
+    return nodes.filter(n => n.selected && n.type === 'section').map(n => n.id.replace('section-', ''));
+  }, [nodes]);
+
+  const getSelectedStickySlugs = useCallback(() => {
+    return nodes.filter(n => n.selected && n.type === 'sticky').map(n => n.id.replace('sticky-', ''));
+  }, [nodes]);
+
   const clearSelection = useCallback(() => {
     setNodes(currentNodes => currentNodes.map(n => ({ ...n, selected: false })));
   }, [setNodes]);
@@ -364,6 +444,9 @@ function CanvasInner({
     },
     handleAddImage,
     onPlacementClick,
+    onAddSection: onSectionCreate,
+    onAddSticky: onStickyCreate,
+    onStickyColorChange,
     onNoteMoveToCategory,
     onImageMoveToCategory,
     onDeleteRequest: handleDeleteRequest,
@@ -399,10 +482,15 @@ function CanvasInner({
     nodes,
     getSelectedNoteSlugs,
     getSelectedImageIds,
+    getSelectedSectionSlugs,
+    getSelectedStickySlugs,
     clearSelection,
     handleUndo,
     handleRedo,
     onDeleteRequest: handleDeleteRequest,
+    onAddSection: onSectionCreate,
+    onAddSticky: onStickyCreate,
+    screenToFlowPosition,
   });
 
   // Track shift key
@@ -505,11 +593,17 @@ function CanvasInner({
       if (update.id.startsWith('image-')) {
         const imageId = update.id.replace('image-', '');
         onImagePositionChange(imageId, { x: update.x, y: update.y });
+      } else if (update.id.startsWith('section-')) {
+        const sectionSlug = update.id.replace('section-', '');
+        onSectionPositionChange(sectionSlug, { x: update.x, y: update.y });
+      } else if (update.id.startsWith('sticky-')) {
+        const stickySlug = update.id.replace('sticky-', '');
+        onStickyPositionChange(stickySlug, { x: update.x, y: update.y });
       } else {
         onNotePositionChange(update.id, { x: update.x, y: update.y });
       }
     }
-  }, [setNodes, onNotePositionChange, onImagePositionChange, nodes, history]);
+  }, [setNodes, onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange, nodes, history]);
 
   useEffect(() => {
     if (onUpdateNodePositionsRef) {
@@ -554,23 +648,37 @@ function CanvasInner({
       await onImagesDelete(imagesToDelete);
       setImagesToDelete([]);
     }
+    if (sectionsToDelete.length > 0 && onSectionsDelete) {
+      await onSectionsDelete(sectionsToDelete);
+      setSectionsToDelete([]);
+    }
+    if (stickiesToDelete.length > 0 && onStickiesDelete) {
+      await onStickiesDelete(stickiesToDelete);
+      setStickiesToDelete([]);
+    }
     setDeleteDialogOpen(false);
-  }, [notesToDelete, onNotesDelete, imagesToDelete, onImagesDelete]);
+  }, [notesToDelete, onNotesDelete, imagesToDelete, onImagesDelete, sectionsToDelete, onSectionsDelete, stickiesToDelete, onStickiesDelete]);
 
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false);
     setNotesToDelete([]);
     setImagesToDelete([]);
+    setSectionsToDelete([]);
+    setStickiesToDelete([]);
   }, []);
 
   const getDeleteDialogMessage = () => {
-    const totalCount = notesToDelete.length + imagesToDelete.length;
+    const totalCount = notesToDelete.length + imagesToDelete.length + sectionsToDelete.length + stickiesToDelete.length;
     if (totalCount === 1) {
       if (notesToDelete.length === 1) {
         const note = notes.find(n => n.slug === notesToDelete[0]);
         return `Are you sure you want to delete "${note?.title || 'Untitled'}"?`;
-      } else {
+      } else if (imagesToDelete.length === 1) {
         return `Are you sure you want to delete this image?`;
+      } else if (sectionsToDelete.length === 1) {
+        return `Are you sure you want to delete this section?`;
+      } else {
+        return `Are you sure you want to delete this sticky note?`;
       }
     }
     const parts = [];
@@ -580,16 +688,29 @@ function CanvasInner({
     if (imagesToDelete.length > 0) {
       parts.push(`${imagesToDelete.length} image${imagesToDelete.length > 1 ? 's' : ''}`);
     }
+    if (sectionsToDelete.length > 0) {
+      parts.push(`${sectionsToDelete.length} section${sectionsToDelete.length > 1 ? 's' : ''}`);
+    }
+    if (stickiesToDelete.length > 0) {
+      parts.push(`${stickiesToDelete.length} sticky note${stickiesToDelete.length > 1 ? 's' : ''}`);
+    }
     return `Are you sure you want to delete ${parts.join(' and ')}?`;
   };
 
   const getDeleteDialogTitle = () => {
-    if (imagesToDelete.length > 0 && notesToDelete.length === 0) {
-      return imagesToDelete.length === 1 ? 'Delete Image' : 'Delete Images';
-    }
-    if (notesToDelete.length > 0 && imagesToDelete.length === 0) {
-      return notesToDelete.length === 1 ? 'Delete Note' : 'Delete Notes';
-    }
+    const hasNotes = notesToDelete.length > 0;
+    const hasImages = imagesToDelete.length > 0;
+    const hasSections = sectionsToDelete.length > 0;
+    const hasStickies = stickiesToDelete.length > 0;
+    const typeCount = [hasNotes, hasImages, hasSections, hasStickies].filter(Boolean).length;
+    
+    if (typeCount > 1) return 'Delete Items';
+    
+    if (hasImages) return imagesToDelete.length === 1 ? 'Delete Image' : 'Delete Images';
+    if (hasNotes) return notesToDelete.length === 1 ? 'Delete Note' : 'Delete Notes';
+    if (hasSections) return sectionsToDelete.length === 1 ? 'Delete Section' : 'Delete Sections';
+    if (hasStickies) return stickiesToDelete.length === 1 ? 'Delete Sticky Note' : 'Delete Sticky Notes';
+    
     return 'Delete Items';
   };
 
@@ -605,6 +726,12 @@ function CanvasInner({
           if (change.id.startsWith('image-')) {
             const imageId = change.id.replace('image-', '');
             onImagePositionChange(imageId, change.position);
+          } else if (change.id.startsWith('section-')) {
+            const sectionSlug = change.id.replace('section-', '');
+            onSectionPositionChange(sectionSlug, change.position);
+          } else if (change.id.startsWith('sticky-')) {
+            const stickySlug = change.id.replace('sticky-', '');
+            onStickyPositionChange(stickySlug, change.position);
           } else {
             onNotePositionChange(change.id, change.position);
           }
@@ -636,12 +763,18 @@ function CanvasInner({
         if (change.id.startsWith('image-')) {
           const imageId = change.id.replace('image-', '');
           onImagePositionChange(imageId, change.position);
+        } else if (change.id.startsWith('section-')) {
+          const sectionSlug = change.id.replace('section-', '');
+          onSectionPositionChange(sectionSlug, change.position);
+        } else if (change.id.startsWith('sticky-')) {
+          const stickySlug = change.id.replace('sticky-', '');
+          onStickyPositionChange(stickySlug, change.position);
         } else {
           onNotePositionChange(change.id, change.position);
         }
       }
     }
-  }, [onNodesChange, onNotePositionChange, onImagePositionChange, nodes, isTouch, activeTool, nodeDrag.shiftKeyRef]);
+  }, [onNodesChange, onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange, nodes, isTouch, activeTool, nodeDrag.shiftKeyRef]);
 
   // Handle pane click
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
