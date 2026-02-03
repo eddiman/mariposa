@@ -78,6 +78,18 @@ export function Sidebar({
     return categories.find(c => c.name === previousCategoryView) || null;
   }, [previousCategoryView, categories]);
 
+  // Reset drilldown view when the active category is deleted
+  useEffect(() => {
+    if (activeCategoryView && activeCategoryView !== 'all-notes') {
+      const categoryExists = categories.some(c => c.name === activeCategoryView);
+      if (!categoryExists && !loading) {
+        // Category was deleted, go back to main view
+        setActiveCategoryView(null);
+        setPreviousCategoryView(null);
+      }
+    }
+  }, [activeCategoryView, categories, loading]);
+
   const handleCategoryChevronClick = useCallback((categoryName: string) => {
     setActiveCategoryView(categoryName);
   }, []);
