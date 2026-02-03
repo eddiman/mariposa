@@ -245,11 +245,9 @@ function AppContent() {
 
   const handleDeleteCategoryConfirm = useCallback(async (slug: string, moveNotesTo?: string) => {
     await deleteCategory(slug, moveNotesTo);
-    // If we were viewing the deleted category, go back to all notes
-    if (currentSpace === slug) {
-      setCurrentSpace(null);
-    }
-  }, [deleteCategory, currentSpace, setCurrentSpace]);
+    // After deleting a category, go back to all notes
+    setCurrentSpace(null);
+  }, [deleteCategory, setCurrentSpace]);
 
   // Wrapper for moving notes - also refetches category counts
   const handleNoteMoveToCategory = useCallback(async (slug: string, category: string) => {
