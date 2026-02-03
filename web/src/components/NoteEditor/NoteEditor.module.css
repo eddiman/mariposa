@@ -3,12 +3,12 @@
   position: fixed;
   inset: 0;
   background: var(--color-card);
-  z-index: 200;
+  z-index: var(--z-editor);
   display: flex;
   flex-direction: column;
   transform-origin: center center;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-smooth), 
+              border-radius var(--transition-smooth);
   will-change: transform;
 }
 
@@ -23,13 +23,13 @@
 }
 
 .note-editor-fullscreen.closing {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-radius 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-medium), 
+              border-radius var(--transition-medium);
 }
 
 .closing {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-radius 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-medium), 
+              border-radius var(--transition-medium);
 }
 
 /* Top bar with back button, status, and delete */
@@ -40,25 +40,25 @@
   align-items: center;
   justify-content: space-between;
   /* Extra left padding to avoid overlap with sidebar toggle button */
-  padding: 16px 24px 16px calc(24px + 44px + 1rem);
+  padding: var(--spacing-4) var(--spacing-6) var(--spacing-4) calc(var(--spacing-6) + var(--touch-target) + var(--spacing-4));
   background: var(--color-card);
-  z-index: 10;
-  border-bottom: 1px solid transparent;
-  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: var(--z-dropdown);
+  border-bottom: 0.0625rem solid transparent;
+  transition: padding-left var(--transition-smooth);
 }
 
 /* Shift topbar content when sidebar is open */
 .note-editor-topbar.sidebar-open {
-  padding-left: calc(280px + 24px);
+  padding-left: calc(var(--sidebar-width) + var(--spacing-6));
 }
 
 .sidebar-open {
-  padding-left: calc(280px + 24px);
+  padding-left: calc(var(--sidebar-width) + var(--spacing-6));
 }
 
 .note-editor-back {
-  width: 3rem;
-  height: 3rem;
+  width: var(--touch-target-lg);
+  height: var(--touch-target-lg);
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
@@ -67,34 +67,34 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .note-editor-back:hover {
-  background: #f0f0f0;
+  background: var(--color-hover-bg);
   color: var(--color-text);
 }
 
 .note-editor-status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .note-editor-unsaved,
 .note-editor-saving,
 .note-editor-saved {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
 
 .note-editor-saved {
-  color: #2ecc71;
+  color: var(--color-success);
 }
 
 .note-editor-delete {
-  width: 3rem;
-  height: 3rem;
+  width: var(--touch-target-lg);
+  height: var(--touch-target-lg);
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
@@ -103,62 +103,62 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .note-editor-delete:hover {
-  background: #fee;
-  color: #c00;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 
 /* Scrollable content area */
 .note-editor-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0 24px 60px;
+  padding: 0 var(--spacing-6) var(--spacing-15);
   display: flex;
   justify-content: center;
 }
 
 /* Centered paper container */
 .note-editor-paper {
-  max-width: 700px;
+  max-width: var(--content-max-width);
   /* margin: 0 auto; */
-  padding: 40px 0;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: var(--spacing-10) 0;
+  transition: margin-left var(--transition-smooth);
 }
 
 /* When sidebar is open, shift paper right by sidebar width */
 .note-editor-paper.sidebar-open {
-  margin-left: calc(280px + 24px);
+  margin-left: calc(var(--sidebar-width) + var(--spacing-6));
 }
 
 .paper-sidebar-open {
-  margin-left: calc(280px + 24px);
+  margin-left: calc(var(--sidebar-width) + var(--spacing-6));
 }
 
 /* Large title input */
 .note-editor-title {
   width: 100%;
-  font-size: 40px;
-  font-weight: 700;
+  font-size: var(--font-size-5xl);
+  font-weight: var(--font-weight-bold);
   border: none;
   outline: none;
   padding: 0;
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-6);
   background: transparent;
   color: var(--color-text);
   font-family: var(--font-heading);
-  line-height: 1.2;
+  line-height: var(--line-height-tight);
 }
 
 .note-editor-title::placeholder {
-  color: #ccc;
+  color: var(--color-disabled);
 }
 
 /* Tags section in editor */
 .note-editor-tags {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-4);
 }
 
 /* Loading and error states */
@@ -170,12 +170,12 @@
   justify-content: center;
   height: 100%;
   color: var(--color-text-secondary);
-  gap: 16px;
+  gap: var(--spacing-4);
 }
 
 .note-editor-error-state button {
-  padding: 8px 16px;
-  border: 1px solid var(--color-border);
+  padding: var(--spacing-2) var(--spacing-4);
+  border: 0.0625rem solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-card);
   cursor: pointer;
@@ -183,7 +183,7 @@
 
 /* === Note Editor Category === */
 .note-editor-category-row {
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-3);
 }
 
 .note-editor-category-wrapper {
@@ -194,64 +194,64 @@
 .note-editor-category-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  gap: var(--spacing-1-5);
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .note-editor-category-btn:hover {
-  background: #f0f0f0;
-  border-color: #ccc;
+  background: var(--color-hover-bg);
+  border-color: var(--color-disabled);
 }
 
 .note-editor-category-dropdown {
   position: absolute;
   top: 100%;
   left: 0;
-  margin-top: 4px;
+  margin-top: var(--spacing-1);
   background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-card-hover);
-  min-width: 180px;
-  max-height: 240px;
+  min-width: 11.25rem;
+  max-height: 15rem;
   overflow-y: auto;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .note-editor-category-option {
   display: block;
   width: 100%;
-  padding: 10px 14px;
+  padding: var(--spacing-2-5) var(--spacing-3-5);
   border: none;
   background: transparent;
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 
 .note-editor-category-option:hover {
-  background: #f0f0f0;
+  background: var(--color-hover-bg);
 }
 
 .note-editor-category-option.active {
-  background: rgba(0, 102, 204, 0.08);
+  background: var(--color-primary-bg);
   color: var(--color-primary);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .active {
-  background: rgba(0, 102, 204, 0.08);
+  background: var(--color-primary-bg);
   color: var(--color-primary);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 /* === Note Editor Dates === */
@@ -259,16 +259,16 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
-  font-size: 12px;
+  gap: var(--spacing-1-5);
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
 }
 
 .note-editor-date {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
 }
 
 .note-editor-date svg {
@@ -280,51 +280,51 @@
 }
 
 /* === Mobile Responsive === */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .note-editor-topbar {
-    /* padding: calc(12px + var(--safe-area-inset-top)) 16px 12px calc(16px + 44px + 2rem); */
+    /* padding: calc(var(--spacing-3) + var(--safe-area-inset-top)) var(--spacing-4) var(--spacing-3) calc(var(--spacing-4) + var(--touch-target) + var(--spacing-8)); */
   }
   
   .note-editor-content {
-    padding: 0 1rem calc(40px + var(--safe-area-inset-bottom));
+    padding: 0 var(--spacing-4) calc(var(--spacing-10) + var(--safe-area-inset-bottom));
   }
   
   .note-editor-paper {
-    padding: 1.5 0;
+    padding: var(--spacing-6) 0;
   }
   
   .note-editor-title {
-    font-size: 28px;
-    margin-bottom: 16px;
+    font-size: var(--font-size-3xl);
+    margin-bottom: var(--spacing-4);
   }
   
   /* Increase touch targets */
   .note-editor-back,
   .note-editor-delete {
-    width: 3rem;
-    height: 3rem;
+    width: var(--touch-target-lg);
+    height: var(--touch-target-lg);
   }
   
   /* Category selector in editor */
   .note-editor-category-btn {
-    padding: 10px 14px;
-    min-height: 44px;
+    padding: var(--spacing-2-5) var(--spacing-3-5);
+    min-height: var(--touch-target);
   }
   
   .note-editor-category-option {
-    padding: 14px 16px;
-    min-height: 48px;
+    padding: var(--spacing-3-5) var(--spacing-4);
+    min-height: var(--touch-target-lg);
   }
 }
 
 /* Small mobile breakpoint */
-@media (max-width: 480px) {
+@media (max-width: 30rem) {
   .note-editor-title {
-    font-size: 24px;
+    font-size: var(--font-size-2xl);
   }
   
   .note-editor-paper {
-    padding: 16px 0;
+    padding: var(--spacing-4) 0;
   }
 }
 
@@ -338,13 +338,13 @@
   }
   
   .note-editor-back:active {
-    background: #e0e0e0;
+    background: var(--color-active-bg);
     color: var(--color-text);
   }
   
   .note-editor-delete:active {
-    background: #fee;
-    color: #c00;
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
   }
   
   /* Note editor category button - use active state */
@@ -354,7 +354,7 @@
   }
   
   .note-editor-category-btn:active {
-    background: #e0e0e0;
+    background: var(--color-active-bg);
   }
   
   /* Note editor category option - use active state */
@@ -363,6 +363,6 @@
   }
   
   .note-editor-category-option:active {
-    background: #e0e0e0;
+    background: var(--color-active-bg);
   }
 }

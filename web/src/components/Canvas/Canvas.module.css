@@ -19,7 +19,7 @@
 
 /* Animate node positions when aligning */
 .canvas-container.animating :global(.react-flow__node) {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-smooth);
 }
 
 .canvas-loading {
@@ -51,7 +51,7 @@
 }
 
 :global(.react-flow__controls-button:hover) {
-  background: #f0f0f0;
+  background: var(--color-hover-bg);
 }
 
 :global(.react-flow__minimap) {
@@ -63,6 +63,6 @@
 /* Selection rectangle around selected nodes */
 :global(.react-flow__nodesselection-rect) {
   background: rgba(0, 102, 204, 0) !important;
-  border: 2px solid var(--color-primary) !important;
+  border: 0.125rem solid var(--color-primary) !important;
   border-radius: var(--radius-sm);
 }

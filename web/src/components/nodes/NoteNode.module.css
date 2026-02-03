@@ -1,34 +1,34 @@
 /* === Note Node (Paper Card) === */
 .note-node {
   /* A4 proportions: 1:1.414 */
-  width: 200px;
-  height: 283px;
+  width: var(--note-width);
+  height: var(--note-height);
   background: var(--color-card);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
   overflow: hidden;
   position: relative;
 }
 
 .note-node:hover {
   box-shadow: var(--shadow-card-hover);
-  transform: translateY(-4px);
+  transform: translateY(-0.25rem);
 }
 
 /* Highlighted note animation (when navigating from sidebar) */
 .note-node.highlighted {
-  animation: noteHighlightPulse 0.5s ease-out;
+  animation: noteHighlightPulse var(--transition-bounce);
 }
 
 @keyframes noteHighlightPulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(0, 102, 204, 0.6), var(--shadow-card);
+    box-shadow: 0 0 0 0 var(--color-primary-60), var(--shadow-card);
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(0, 102, 204, 0), var(--shadow-card-hover);
-    transform: translateY(-4px);
+    box-shadow: 0 0 0 0.75rem rgba(0, 102, 204, 0), var(--shadow-card-hover);
+    transform: translateY(-0.25rem);
   }
   100% {
     box-shadow: var(--shadow-card);
@@ -39,15 +39,15 @@
 .note-node-paper {
   width: 100%;
   height: 100%;
-  padding: 20px 18px;
+  padding: var(--spacing-5) 1.125rem;
   overflow: hidden;
   position: relative;
 }
 
 .note-node-title {
-  font-size: 14px;
-  font-weight: 700;
-  margin: 0 0 10px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--spacing-2-5);
   line-height: 1.3;
   color: var(--color-text);
   overflow: hidden;
@@ -62,60 +62,60 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
+  height: var(--spacing-15);
   background: linear-gradient(to bottom, transparent 0%, var(--color-card) 100%);
   pointer-events: none;
 }
 
 /* Read-only content styling in cards - global because TipTap sets this class */
 :global(.note-card-content) {
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--font-size-xxs);
+  line-height: var(--line-height-normal);
   color: var(--color-text);
 }
 
 :global(.note-card-content) h1 {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 8px;
-  line-height: 1.2;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--spacing-2);
+  line-height: var(--line-height-tight);
 }
 
 :global(.note-card-content) h2 {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 10px 0 6px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  margin: var(--spacing-2-5) 0 var(--spacing-1-5);
   line-height: 1.3;
 }
 
 :global(.note-card-content) h3 {
-  font-size: 12px;
-  font-weight: 600;
-  margin: 8px 0 4px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  margin: var(--spacing-2) 0 var(--spacing-1);
   line-height: 1.3;
 }
 
 :global(.note-card-content) p {
-  margin: 0 0 6px;
+  margin: 0 0 var(--spacing-1-5);
 }
 
 :global(.note-card-content) ul,
 :global(.note-card-content) ol {
-  margin: 0 0 6px;
-  padding-left: 14px;
+  margin: 0 0 var(--spacing-1-5);
+  padding-left: var(--spacing-3-5);
 }
 
 :global(.note-card-content) li {
-  margin: 2px 0;
+  margin: var(--spacing-0-5) 0;
 }
 
 :global(.note-card-content) mark {
   background: var(--color-highlight);
-  padding: 1px 2px;
+  padding: 0.0625rem var(--spacing-0-5);
 }
 
 :global(.note-card-content) strong {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 :global(.note-card-content) em {
@@ -126,16 +126,16 @@
 :global(.note-preview-image) {
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
-  margin: 6px 0;
+  border-radius: var(--spacing-1);
+  margin: var(--spacing-1-5) 0;
   display: block;
 }
 
 /* Note Node Category */
 .note-node-category {
-  font-size: 11px;
+  font-size: var(--font-size-xxs);
   color: var(--color-text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,7 +143,7 @@
 
 /* Selected node styling via React Flow */
 :global(.react-flow__node.selected) .note-node {
-  box-shadow: 0 0 0 3px var(--color-primary), var(--shadow-card-hover);
+  box-shadow: 0 0 0 0.1875rem var(--color-primary), var(--shadow-card-hover);
 }
 
 /* === Touch Device Overrides === */

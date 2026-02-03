@@ -1,17 +1,17 @@
 /* === Ghost Note (Placement Mode) === */
 .ghost-note {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--z-context-menu);
   pointer-events: none;
   /* Scaled down version of the note card */
-  width: 120px;
-  height: 160px;
+  width: var(--ghost-note-width);
+  height: var(--ghost-note-height);
   background: var(--color-card);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow-card-hover);
   opacity: 0.5;
   overflow: hidden;
-  animation: ghostNoteAppear 0.15s ease;
+  animation: ghostNoteAppear var(--transition-fast);
 }
 
 @keyframes ghostNoteAppear {
@@ -26,7 +26,7 @@
 }
 
 .ghost-note-paper {
-  padding: 14px 12px;
+  padding: var(--spacing-3-5) var(--spacing-3);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -35,14 +35,14 @@
 }
 
 .ghost-note-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 6px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--spacing-1-5);
   color: var(--color-text);
 }
 
 .ghost-note-hint {
-  font-size: 11px;
+  font-size: var(--font-size-xxs);
   color: var(--color-text-secondary);
   margin: 0;
 }
