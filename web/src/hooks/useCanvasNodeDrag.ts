@@ -1,13 +1,15 @@
 import { useCallback, useRef } from 'react';
 import type { Node } from '@xyflow/react';
-import type { Position } from '../types';
+import type { Position, Section } from '../types';
 import type { NodeSnapshot, HistoryAction } from './useCanvasHistory';
 import type { GuideLine } from '../components/SnapGuides';
+import { getSectionContainingNode } from '../utils/sectionPositioning.js';
 
 interface UseCanvasNodeDragProps<T extends Record<string, unknown>> {
   isTouch: boolean;
   activeTool: string;
   settings: { snapToObject: boolean; showSnapLines: boolean };
+  sections: Section[];
   getNodes: () => Node<T>[];
   setNodes: React.Dispatch<React.SetStateAction<Node<T>[]>>;
   calculateSnap: (node: Node<T>, allNodes: Node<T>[]) => { x: number; y: number; guides: GuideLine[] };
@@ -18,6 +20,7 @@ interface UseCanvasNodeDragProps<T extends Record<string, unknown>> {
   onImagePositionChange: (id: string, position: Position) => void;
   onSectionPositionChange: (slug: string, position: Position) => void;
   onStickyPositionChange: (slug: string, position: Position) => void;
+  onNoteSectionChange?: (noteSlug: string, sectionSlug: string | null) => void;
 }
 
 // Helper to check if a node is inside a section's bounds
@@ -51,6 +54,7 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
   isTouch,
   activeTool,
   settings,
+  sections,
   getNodes,
   setNodes,
   calculateSnap,
@@ -61,9 +65,12 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
   onImagePositionChange,
   onSectionPositionChange,
   onStickyPositionChange,
+  onNoteSectionChange,
 }: UseCanvasNodeDragProps<T>) {
   const shiftKeyRef = useRef(false);
   const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Track which section each note was in at drag start
+  const dragStartSectionsRef = useRef<Map<string, string | undefined>>(new Map());
   // Track nodes contained within a dragged section
   const containedNodesRef = useRef<Set<string>>(new Set());
   // Track the section being dragged (if any)
@@ -87,8 +94,14 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
 
     // Capture starting positions of all dragged nodes
     dragStartPositionsRef.current.clear();
+    dragStartSectionsRef.current.clear();
     for (const n of draggedNodes) {
       dragStartPositionsRef.current.set(n.id, { x: n.position.x, y: n.position.y });
+      // Capture which section each note is in at drag start
+      if (n.type === 'note') {
+        const containingSection = getSectionContainingNode(n, sections);
+        dragStartSectionsRef.current.set(n.id, containingSection);
+      }
     }
 
     // Check if we're dragging a section - if so, find contained nodes
@@ -111,7 +124,7 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
         }
       }
     }
-  }, [setNodes, isTouch, activeTool, getNodes]);
+  }, [setNodes, isTouch, activeTool, getNodes, sections]);
 
   // Handle node drag for snap-to-guides and section grouped movement
   const handleNodeDrag = useCallback((_event: React.MouseEvent, node: Node<T>) => {
@@ -169,6 +182,7 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
     // Get current node positions for contained nodes (they may have moved)
     const allNodes = getNodes();
     const nodePositionMap = new Map(allNodes.map(n => [n.id, n.position]));
+    const nodeMap = new Map(allNodes.map(n => [n.id, n]));
 
     // Build history action from captured start positions
     if (dragStartPositionsRef.current.size > 0) {
@@ -240,13 +254,29 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
       }
     }
 
+    // Detect section membership changes for notes
+    if (onNoteSectionChange) {
+      for (const [noteId, startSection] of dragStartSectionsRef.current) {
+        const node = nodeMap.get(noteId);
+        if (!node) continue;
+        
+        const currentSection = getSectionContainingNode(node, sections);
+        
+        // If section membership changed, notify the callback
+        if (startSection !== currentSection) {
+          onNoteSectionChange(noteId, currentSection ?? null);
+        }
+      }
+    }
+    dragStartSectionsRef.current.clear();
+
     // Clear section drag tracking
     containedNodesRef.current.clear();
     draggedSectionRef.current = null;
     lastSectionPositionRef.current = null;
 
     clearGuides();
-  }, [getNodes, onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange, clearGuides, historyPush, isTouch, activeTool]);
+  }, [getNodes, onNotePositionChange, onImagePositionChange, onSectionPositionChange, onStickyPositionChange, onNoteSectionChange, clearGuides, historyPush, isTouch, activeTool, sections]);
 
   return {
     shiftKeyRef,

@@ -15,6 +15,7 @@ export interface Note {
   category: string;
   tags: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +26,7 @@ export interface NoteMeta {
   category: string;
   tags: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +42,7 @@ export interface NoteCreateInput {
   category?: string;
   tags?: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
 }
 
 export interface NoteUpdateInput {
@@ -48,6 +51,7 @@ export interface NoteUpdateInput {
   category?: string;
   tags?: string[];
   position?: Position;
+  section?: string | null; // null to clear section
 }
 
 export interface CategoryMeta {

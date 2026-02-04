@@ -128,6 +128,7 @@ function AppContent() {
 
   // Sidebar notes hook
   const {
+    focusOnNodeRef,
     handleFocusOnNodeRef,
     handleSidebarNoteClick,
     handleSidebarNoteEdit,
@@ -355,6 +356,41 @@ function AppContent() {
     return result;
   }, [moveImageToCategory, refetchCategories]);
 
+  // Handler for moving notes to sections (or clearing section)
+  const handleNoteMoveToSection = useCallback(async (slug: string, sectionSlug: string | null) => {
+    // Find the target section to get its position (for repositioning the note)
+    const targetSection = sectionSlug ? sections.find(s => s.slug === sectionSlug) : null;
+    
+    if (sectionSlug && targetSection?.position) {
+      // Move to section - position note inside section bounds
+      const newPosition = {
+        x: targetSection.position.x + 20,
+        y: targetSection.position.y + 20,
+      };
+      const result = await updateNote(slug, { section: sectionSlug, position: newPosition });
+      return result;
+    } else {
+      // Clear section (set to null)
+      const result = await updateNote(slug, { section: null });
+      return result;
+    }
+  }, [sections, updateNote]);
+
+  // Handler for canvas drag-based section membership changes
+  // Unlike handleNoteMoveToSection, this doesn't reposition the note (user already dragged it)
+  const handleNoteSectionChange = useCallback((noteSlug: string, sectionSlug: string | null) => {
+    updateNote(noteSlug, { section: sectionSlug });
+  }, [updateNote]);
+
+  // Handler for sidebar section click (pan to section)
+  const handleSidebarSectionClick = useCallback((sectionSlug: string) => {
+    // Use the focusOnNodeRef to pan to the section
+    // Section node IDs have format "section-{sectionSlug}"
+    if (focusOnNodeRef.current) {
+      focusOnNodeRef.current(`section-${sectionSlug}`, { zoom: 1, duration: 300 });
+    }
+  }, [focusOnNodeRef]);
+
   return (
     <div className="app">
       {/* Morphing sidebar with integrated toggle */}
@@ -373,6 +409,8 @@ function AppContent() {
         onAddNote={handleSidebarAddNote}
         onNoteUpdateRef={handleSidebarNoteUpdateRef}
         loading={loadingCategories}
+        sections={sections}
+        onSectionClick={handleSidebarSectionClick}
       />
       
       <main className={`app-main full ${isPlacementMode ? 'placement-mode' : ''}`}>
@@ -396,6 +434,7 @@ function AppContent() {
           onImageDuplicate={handleImageDuplicate}
           onNoteMoveToCategory={handleNoteMoveToCategory}
           onImageMoveToCategory={handleImageMoveToCategory}
+          onNoteSectionChange={handleNoteSectionChange}
           onSectionCreate={handleSectionCreate}
           onSectionPositionChange={handleSectionPositionChange}
           onSectionResize={handleSectionResize}
@@ -484,6 +523,8 @@ function AppContent() {
             onDelete={handleNoteDelete}
             onMoveToCategory={handleNoteMoveToCategory}
             getNote={getNote}
+            sections={sections}
+            onMoveToSection={handleNoteMoveToSection}
           />
         )}
       </Suspense>

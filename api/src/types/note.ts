@@ -13,6 +13,7 @@ export const NoteCreateSchema = z.object({
   category: z.string().default('uncategorized'),
   tags: z.array(z.string()).default([]),
   position: PositionSchema.optional(),
+  section: z.string().optional(), // Section slug (e.g., "section-1")
 });
 
 export const NoteUpdateSchema = z.object({
@@ -21,6 +22,7 @@ export const NoteUpdateSchema = z.object({
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   position: PositionSchema.optional(),
+  section: z.string().nullable().optional(), // null to clear section
 });
 
 export const NoteQuerySchema = z.object({
@@ -59,6 +61,7 @@ export interface Note {
   category: string;
   tags: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +72,7 @@ export interface NoteMeta {
   category: string;
   tags: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
   createdAt: string;
   updatedAt: string;
 }

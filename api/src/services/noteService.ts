@@ -91,6 +91,7 @@ class NoteService {
       category,
       tags: input.tags || [],
       position: input.position,
+      section: input.section,
       createdAt: now,
       updatedAt: now,
     };
@@ -119,6 +120,16 @@ class NoteService {
     const now = new Date().toISOString();
     const newCategory = input.category || existingNote.category;
 
+    // Handle section field - null means clear, undefined means keep existing
+    let newSection: string | undefined;
+    if (input.section === null) {
+      newSection = undefined; // Clear section
+    } else if (input.section !== undefined) {
+      newSection = input.section; // Set new section
+    } else {
+      newSection = existingNote.section; // Keep existing
+    }
+
     const updatedNote: Note = {
       ...existingNote,
       title: input.title ?? existingNote.title,
@@ -126,6 +137,7 @@ class NoteService {
       category: newCategory,
       tags: input.tags ?? existingNote.tags,
       position: input.position ?? existingNote.position,
+      section: newSection,
       updatedAt: now,
     };
 

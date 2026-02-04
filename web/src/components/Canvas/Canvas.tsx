@@ -70,6 +70,7 @@ interface CanvasProps {
   onImageDuplicate: (id: string, position: Position) => Promise<void>;
   onNoteMoveToCategory?: (slug: string, category: string) => Promise<Note | null>;
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
+  onNoteSectionChange?: (noteSlug: string, sectionSlug: string | null) => void;
   // Section handlers
   onSectionCreate?: (position: Position) => void;
   onSectionPositionChange: (slug: string, position: Position) => void;
@@ -146,6 +147,7 @@ function CanvasInner({
   onImageDuplicate,
   onNoteMoveToCategory,
   onImageMoveToCategory,
+  onNoteSectionChange,
   onSectionCreate,
   onSectionPositionChange,
   onSectionResize,
@@ -490,6 +492,7 @@ function CanvasInner({
     isTouch,
     activeTool,
     settings,
+    sections,
     getNodes,
     setNodes,
     calculateSnap,
@@ -500,6 +503,7 @@ function CanvasInner({
     onImagePositionChange,
     onSectionPositionChange,
     onStickyPositionChange,
+    onNoteSectionChange,
   });
 
   // Keyboard shortcuts

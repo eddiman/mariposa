@@ -7,6 +7,7 @@ export interface FrontmatterData {
   category: string;
   tags: string[];
   position?: Position;
+  section?: string; // Section slug (e.g., "section-1")
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,7 @@ export function parseNote(fileContent: string): Note {
     category: meta.category || 'uncategorized',
     tags: meta.tags || [],
     position,
+    section: meta.section,
     createdAt: meta.createdAt || new Date().toISOString(),
     updatedAt: meta.updatedAt || new Date().toISOString(),
   };
@@ -52,6 +54,11 @@ export function serializeNote(note: Note): string {
     frontmatter.position = note.position;
   }
 
+  // Only include section if it exists
+  if (note.section) {
+    frontmatter.section = note.section;
+  }
+
   return matter.stringify(note.content, frontmatter);
 }
 
@@ -65,6 +72,7 @@ export function parseNoteMeta(fileContent: string): NoteMeta {
     category: meta.category,
     tags: meta.tags || [],
     position: meta.position,
+    section: meta.section,
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
   };

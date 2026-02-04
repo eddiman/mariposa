@@ -1,15 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { SidebarNoteItem } from './SidebarNoteItem.js';
-import type { CategoryMeta, NoteMeta } from '../../types/index.js';
+import type { CategoryMeta, NoteMeta, Section } from '../../types/index.js';
 import styles from './Sidebar.module.css';
 
 interface SidebarCategoryViewProps {
   category: CategoryMeta;
   notes: NoteMeta[] | null;
+  sections?: Section[];
   isLoading: boolean;
   onBack: () => void;
   onNoteTitleClick: (slug: string) => void;
   onNoteChevronClick: (slug: string) => void;
+  onSectionClick?: (sectionSlug: string) => void;
   onAddNote: () => void;
   onRenameCategory: () => void;
   onDeleteCategory: () => void;
@@ -18,10 +20,12 @@ interface SidebarCategoryViewProps {
 export function SidebarCategoryView({
   category,
   notes,
+  sections = [],
   isLoading,
   onBack,
   onNoteTitleClick,
   onNoteChevronClick,
+  onSectionClick,
   onAddNote,
   onRenameCategory,
   onDeleteCategory,
@@ -52,6 +56,37 @@ export function SidebarCategoryView({
     setMenuOpen(false);
     onDeleteCategory();
   };
+
+  // Group notes by section
+  const groupedNotes = useMemo(() => {
+    if (!notes) return { sectioned: new Map<string, NoteMeta[]>(), unsectioned: [] };
+    
+    const sectioned = new Map<string, NoteMeta[]>();
+    const unsectioned: NoteMeta[] = [];
+    
+    // Initialize section groups (only for sections that have notes)
+    for (const note of notes) {
+      if (note.section) {
+        if (!sectioned.has(note.section)) {
+          sectioned.set(note.section, []);
+        }
+        sectioned.get(note.section)!.push(note);
+      } else {
+        unsectioned.push(note);
+      }
+    }
+    
+    return { sectioned, unsectioned };
+  }, [notes]);
+
+  // Build ordered section list (only sections with notes, in order they appear in sections prop)
+  const orderedSections = useMemo(() => {
+    return sections.filter(s => groupedNotes.sectioned.has(s.slug));
+  }, [sections, groupedNotes.sectioned]);
+
+  // Determine if we should show section grouping
+  const hasSections = sections.length > 0;
+  const hasNotesInSections = orderedSections.length > 0;
 
   return (
     <div className={styles['sidebar-category-view']}>
@@ -130,14 +165,69 @@ export function SidebarCategoryView({
           <>
             {notes && notes.length > 0 ? (
               <div className={styles['sidebar-category-view-notes']}>
-                {notes.map((note) => (
-                  <SidebarNoteItem
-                    key={note.slug}
-                    note={note}
-                    onTitleClick={() => onNoteTitleClick(note.slug)}
-                    onChevronClick={() => onNoteChevronClick(note.slug)}
-                  />
-                ))}
+                {hasSections && hasNotesInSections ? (
+                  // Grouped by section
+                  <>
+                    {orderedSections.map((section) => {
+                      const sectionNotes = groupedNotes.sectioned.get(section.slug) || [];
+                      return (
+                        <div key={section.slug} className={styles['sidebar-section-group']}>
+                          <button
+                            className={styles['sidebar-section-header']}
+                            onClick={() => onSectionClick?.(section.slug)}
+                            title={`Go to section: ${section.name}`}
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                            </svg>
+                            <span>{section.name}</span>
+                          </button>
+                          {sectionNotes.map((note) => (
+                            <SidebarNoteItem
+                              key={note.slug}
+                              note={note}
+                              onTitleClick={() => onNoteTitleClick(note.slug)}
+                              onChevronClick={() => onNoteChevronClick(note.slug)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {/* Unsectioned notes (only show if there are sections) */}
+                    {groupedNotes.unsectioned.length > 0 && (
+                      <div className={styles['sidebar-section-group']}>
+                        <div className={styles['sidebar-section-header-unsectioned']}>
+                          Unsectioned
+                        </div>
+                        {groupedNotes.unsectioned.map((note) => (
+                          <SidebarNoteItem
+                            key={note.slug}
+                            note={note}
+                            onTitleClick={() => onNoteTitleClick(note.slug)}
+                            onChevronClick={() => onNoteChevronClick(note.slug)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Flat list (no sections or no notes in sections)
+                  notes.map((note) => (
+                    <SidebarNoteItem
+                      key={note.slug}
+                      note={note}
+                      onTitleClick={() => onNoteTitleClick(note.slug)}
+                      onChevronClick={() => onNoteChevronClick(note.slug)}
+                    />
+                  ))
+                )}
               </div>
             ) : (
               <div className={styles['sidebar-category-view-empty']}>

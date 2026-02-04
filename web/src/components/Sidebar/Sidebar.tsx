@@ -5,13 +5,14 @@ import { SidebarAllNotes } from './SidebarAllNotes.js';
 import { SidebarCategoryItem } from './SidebarCategoryItem.js';
 import { SidebarCategoryView } from './SidebarCategoryView.js';
 import { SidebarAllNotesView } from './SidebarAllNotesView.js';
-import type { CategoryMeta, NoteMeta } from '../../types';
+import type { CategoryMeta, NoteMeta, Section } from '../../types';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;
   categories: CategoryMeta[];
+  sections?: Section[];
   currentSpace: string | null;
   onSpaceChange: (space: string | null) => void;
   onSettingsClick: () => void;
@@ -21,6 +22,7 @@ interface SidebarProps {
   onNoteClick: (category: string, slug: string) => void;
   onNoteEdit: (slug: string) => void;
   onAddNote: (category: string) => Promise<NoteMeta | null>;
+  onSectionClick?: (sectionSlug: string) => void;
   onNoteUpdateRef?: (handler: (slug: string, updates: Partial<NoteMeta>) => void) => void;
   loading?: boolean;
 }
@@ -29,6 +31,7 @@ export function Sidebar({
   open,
   onToggle,
   categories,
+  sections = [],
   currentSpace,
   onSpaceChange,
   onSettingsClick,
@@ -38,6 +41,7 @@ export function Sidebar({
   onNoteClick,
   onNoteEdit,
   onAddNote,
+  onSectionClick,
   onNoteUpdateRef,
   loading = false,
 }: SidebarProps) {
@@ -175,14 +179,19 @@ export function Sidebar({
 
     // Category drilldown view
     if (viewToRender && categoryToRender) {
+      // Filter sections for this category
+      const categorySections = sections.filter(s => s.category === viewToRender);
+      
       return (
         <SidebarCategoryView
           category={categoryToRender}
           notes={getNotes(viewToRender)}
+          sections={categorySections}
           isLoading={isLoading(viewToRender)}
           onBack={handleBackToMain}
           onNoteTitleClick={(slug) => handleNoteTitleClick(viewToRender, slug)}
           onNoteChevronClick={handleNoteChevronClick}
+          onSectionClick={onSectionClick}
           onAddNote={() => handleAddNote(viewToRender)}
           onRenameCategory={() => onRenameCategory(categoryToRender)}
           onDeleteCategory={() => onDeleteCategory(categoryToRender)}

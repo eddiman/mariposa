@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Editor } from '../Editor';
 import { Dialog } from '../Dialog';
 import { TagInput } from '../TagInput';
-import type { Note, CategoryMeta } from '../../types';
+import type { Note, CategoryMeta, Section } from '../../types';
 import type { OriginRect } from '../Canvas';
 import styles from './NoteEditor.module.css';
 
@@ -10,24 +10,27 @@ interface NoteEditorProps {
   slug: string;
   originRect: OriginRect | null;
   categories: CategoryMeta[];
+  sections?: Section[];
   initialNote?: Note | null; // Optional - skip loading if provided
   sidebarOpen?: boolean;
   onClose: () => void;
   onSave: (slug: string, content: string, title: string, tags: string[]) => Promise<void>;
   onDelete: (slug: string) => Promise<void>;
   onMoveToCategory: (slug: string, category: string) => Promise<Note | null>;
+  onMoveToSection?: (slug: string, sectionSlug: string | null) => Promise<Note | null>;
   getNote: (slug: string) => Promise<Note | null>;
 }
 
 const AUTOSAVE_DELAY = 1500; // 1.5 seconds after user stops typing
 
-export function NoteEditor({ slug, originRect, categories, initialNote, sidebarOpen, onClose, onSave, onDelete, onMoveToCategory, getNote }: NoteEditorProps) {
+export function NoteEditor({ slug, originRect, categories, sections = [], initialNote, sidebarOpen, onClose, onSave, onDelete, onMoveToCategory, onMoveToSection, getNote }: NoteEditorProps) {
   const [note, setNote] = useState<Note | null>(initialNote || null);
   const [loading, setLoading] = useState(!initialNote);
   const [title, setTitle] = useState(initialNote?.title || '');
   const [content, setContent] = useState(initialNote?.content || '');
   const [tags, setTags] = useState<string[]>(initialNote?.tags || []);
   const [category, setCategory] = useState(initialNote?.category || '');
+  const [section, setSection] = useState<string | undefined>(initialNote?.section);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -35,6 +38,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
   const [isClosing, setIsClosing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
 
   // Refs to track latest values for autosave
   const titleRef = useRef(title);
@@ -43,6 +47,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
   const hasChangesRef = useRef(hasChanges);
   const savingRef = useRef(saving);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const sectionDropdownRef = useRef<HTMLDivElement>(null);
 
   // Keep refs in sync
   useEffect(() => { titleRef.current = title; }, [title]);
@@ -68,6 +73,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
       setContent(initialNote.content);
       setTags(initialNote.tags || []);
       setCategory(initialNote.category || '');
+      setSection(initialNote.section);
       setLoading(false);
       setHasChanges(false);
       setLastSaved(null);
@@ -87,6 +93,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
         setContent(fetchedNote.content);
         setTags(fetchedNote.tags || []);
         setCategory(fetchedNote.category || 'all-notes');
+        setSection(fetchedNote.section);
       }
       setLoading(false);
     };
@@ -95,17 +102,20 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    if (!categoryDropdownOpen) return;
+    if (!categoryDropdownOpen && !sectionDropdownOpen) return;
     
     const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+      if (categoryDropdownOpen && categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
         setCategoryDropdownOpen(false);
+      }
+      if (sectionDropdownOpen && sectionDropdownRef.current && !sectionDropdownRef.current.contains(e.target as Node)) {
+        setSectionDropdownOpen(false);
       }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [categoryDropdownOpen]);
+  }, [categoryDropdownOpen, sectionDropdownOpen]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
@@ -199,6 +209,36 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
     }
   }, [slug, category, onSave, onMoveToCategory, onClose]);
 
+  const handleSectionSelect = useCallback(async (newSectionSlug: string | null) => {
+    setSectionDropdownOpen(false);
+    if (newSectionSlug === section) return;
+    if (!onMoveToSection) return;
+    
+    // Save any pending changes first
+    if (hasChangesRef.current && !savingRef.current) {
+      setSaving(true);
+      await onSave(slug, contentRef.current, titleRef.current, tagsRef.current);
+      setHasChanges(false);
+      setSaving(false);
+    }
+    
+    // Move to new section (or clear section)
+    const result = await onMoveToSection(slug, newSectionSlug);
+    if (result) {
+      setSection(newSectionSlug || undefined);
+    }
+  }, [slug, section, onSave, onMoveToSection]);
+
+  // Get sections available for this note's category
+  const availableSections = sections.filter(s => s.category === category);
+
+  // Get display name for current section
+  const getSectionDisplayName = (sectionSlug: string | undefined) => {
+    if (!sectionSlug) return 'None';
+    const sec = availableSections.find(s => s.slug === sectionSlug);
+    return sec?.name || sectionSlug;
+  };
+
   // Get display name for current category
   const getCategoryDisplayName = (catSlug: string) => {
     if (catSlug === 'all-notes') return 'All Notes';
@@ -231,6 +271,8 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
       if (e.key === 'Escape') {
         if (categoryDropdownOpen) {
           setCategoryDropdownOpen(false);
+        } else if (sectionDropdownOpen) {
+          setSectionDropdownOpen(false);
         } else {
           handleClose();
         }
@@ -242,7 +284,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose, handleSave, deleteDialogOpen, categoryDropdownOpen]);
+  }, [handleClose, handleSave, deleteDialogOpen, categoryDropdownOpen, sectionDropdownOpen]);
 
   // Calculate initial transform based on originRect
   const getInitialStyle = () => {
@@ -363,6 +405,46 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
               )}
             </div>
           </div>
+
+          {/* Section selector (only show if there are sections in this category) */}
+          {availableSections.length > 0 && (
+            <div className={styles['note-editor-section-row']}>
+              <div className={styles['note-editor-section-wrapper']} ref={sectionDropdownRef}>
+                <button 
+                  className={styles['note-editor-section-btn']}
+                  onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                  </svg>
+                  <span>{getSectionDisplayName(section)}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                
+                {sectionDropdownOpen && (
+                  <div className={styles['note-editor-section-dropdown']}>
+                    <button
+                      className={`${styles['note-editor-section-option']} ${!section ? styles['active'] : ''}`}
+                      onClick={() => handleSectionSelect(null)}
+                    >
+                      None
+                    </button>
+                    {availableSections.map(sec => (
+                      <button
+                        key={sec.slug}
+                        className={`${styles['note-editor-section-option']} ${section === sec.slug ? styles['active'] : ''}`}
+                        onClick={() => handleSectionSelect(sec.slug)}
+                      >
+                        {sec.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Date metadata */}
           <div className={styles['note-editor-dates']}>

@@ -254,6 +254,73 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* === Note Editor Section === */
+.note-editor-section-row {
+  margin-bottom: var(--spacing-3);
+}
+
+.note-editor-section-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.note-editor-section-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1-5);
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.note-editor-section-btn:hover {
+  background: var(--color-hover-bg);
+  border-color: var(--color-disabled);
+}
+
+.note-editor-section-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--spacing-1);
+  background: var(--color-card);
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card-hover);
+  min-width: 11.25rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  z-index: var(--z-dropdown);
+}
+
+.note-editor-section-option {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-2-5) var(--spacing-3-5);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.note-editor-section-option:hover {
+  background: var(--color-hover-bg);
+}
+
+.note-editor-section-option.active {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
 /* === Note Editor Dates === */
 .note-editor-dates {
   display: flex;
@@ -315,6 +382,17 @@
     padding: var(--spacing-3-5) var(--spacing-4);
     min-height: var(--touch-target-lg);
   }
+  
+  /* Section selector in editor */
+  .note-editor-section-btn {
+    padding: var(--spacing-2-5) var(--spacing-3-5);
+    min-height: var(--touch-target);
+  }
+  
+  .note-editor-section-option {
+    padding: var(--spacing-3-5) var(--spacing-4);
+    min-height: var(--touch-target-lg);
+  }
 }
 
 /* Small mobile breakpoint */
@@ -363,6 +441,25 @@
   }
   
   .note-editor-category-option:active {
+    background: var(--color-active-bg);
+  }
+  
+  /* Note editor section button - use active state */
+  .note-editor-section-btn:hover {
+    background: transparent;
+    border-color: var(--color-border);
+  }
+  
+  .note-editor-section-btn:active {
+    background: var(--color-active-bg);
+  }
+  
+  /* Note editor section option - use active state */
+  .note-editor-section-option:hover {
+    background: transparent;
+  }
+  
+  .note-editor-section-option:active {
     background: var(--color-active-bg);
   }
 }
