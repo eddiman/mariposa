@@ -294,7 +294,7 @@ export function CategoryDialog({
                     <option value="">Select a category...</option>
                     <option value="all-notes">All Notes</option>
                     {categories
-                      .filter(c => c.name !== categoryToDelete.name)
+                      .filter(c => c.name !== categoryToDelete.name && c.name !== 'all-notes')
                       .map(cat => (
                         <option key={cat.name} value={cat.name}>
                           {cat.displayName}

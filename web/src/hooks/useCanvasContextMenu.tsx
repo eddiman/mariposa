@@ -214,6 +214,7 @@ export function useCanvasContextMenu({
 
       // Build "Change Color" submenu for stickies and sections
       const stickyColors: { label: string; value: StickyColor; hex: string }[] = [
+        { label: 'White', value: 'white', hex: '#ffffff' },
         { label: 'Yellow', value: 'yellow', hex: '#fff9c4' },
         { label: 'Pink', value: 'pink', hex: '#f8bbd0' },
         { label: 'Blue', value: 'blue', hex: '#bbdefb' },

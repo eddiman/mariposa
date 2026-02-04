@@ -119,7 +119,7 @@ export interface SectionsResponse {
 }
 
 // Sticky note types
-export type StickyColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'mint' | 'peach';
+export type StickyColor = 'white' | 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'mint' | 'peach';
 
 export interface Sticky {
   slug: string;

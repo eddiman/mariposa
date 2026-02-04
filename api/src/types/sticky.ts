@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { PositionSchema } from './note.js';
 
 // Sticky note colors
-export const StickyColors = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange', 'mint', 'peach'] as const;
+export const StickyColors = ['white', 'yellow', 'pink', 'blue', 'green', 'purple', 'orange', 'mint', 'peach'] as const;
 export type StickyColor = typeof StickyColors[number];
 
 // Zod schemas for validation

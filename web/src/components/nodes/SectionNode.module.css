@@ -15,43 +15,47 @@
 }
 
 /* Section colors (same as sticky) */
+.white {
+  background: rgb(255, 255, 255);
+  border-color: rgba(224, 224, 224, 0.5);
+}
 .yellow {
-  background: rgba(255, 249, 196, 0.5);
+  background: rgba(255, 249, 196, 1);
   border-color: rgba(255, 235, 59, 0.5);
 }
 
 .pink {
-  background: rgba(248, 187, 208, 0.5);
+  background: rgba(248, 187, 208, 1);
   border-color: rgba(233, 30, 99, 0.3);
 }
 
 .blue {
-  background: rgba(187, 222, 251, 0.5);
+  background: rgba(187, 222, 251, 1);
   border-color: rgba(33, 150, 243, 0.3);
 }
 
 .green {
-  background: rgba(200, 230, 201, 0.5);
+  background: rgba(200, 230, 201, 1);
   border-color: rgba(76, 175, 80, 0.3);
 }
 
 .purple {
-  background: rgba(225, 190, 231, 0.5);
+  background: rgba(225, 190, 231, 1);
   border-color: rgba(156, 39, 176, 0.3);
 }
 
 .orange {
-  background: rgba(255, 224, 178, 0.5);
+  background: rgba(255, 224, 178, 1);
   border-color: rgba(255, 152, 0, 0.3);
 }
 
 .mint {
-  background: rgba(178, 223, 219, 0.5);
+  background: rgba(178, 223, 219, 1);
   border-color: rgba(0, 150, 136, 0.3);
 }
 
 .peach {
-  background: rgba(255, 204, 188, 0.5);
+  background: rgba(255, 204, 188, 1);
   border-color: rgba(255, 87, 34, 0.3);
 }
 

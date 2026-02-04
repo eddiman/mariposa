@@ -3,9 +3,37 @@ import type { Node } from '@xyflow/react';
 import { setModuleClipboard } from './useCanvasClipboard';
 import type { PlacementType } from '../contexts/PlacementContext.js';
 
-interface UseCanvasKeyboardProps {
+// Helper to check if a node is inside a section's bounds
+function isNodeInsideSection<T extends Record<string, unknown>>(
+  node: Node<T>,
+  section: Node<T>
+): boolean {
+  // Don't include sections or the section itself
+  if (node.type === 'section' || node.id === section.id) return false;
+
+  const sectionData = section.data as { width?: number; height?: number };
+  const sectionWidth = sectionData.width || 300;
+  const sectionHeight = sectionData.height || 200;
+
+  const nodeWidth = node.measured?.width ?? (node.type === 'note' ? 200 : node.type === 'sticky' ? 150 : 300);
+  const nodeHeight = node.measured?.height ?? (node.type === 'note' ? 283 : node.type === 'sticky' ? 150 : 200);
+
+  // Check if node center is inside section bounds
+  const nodeCenterX = node.position.x + nodeWidth / 2;
+  const nodeCenterY = node.position.y + nodeHeight / 2;
+
+  return (
+    nodeCenterX >= section.position.x &&
+    nodeCenterX <= section.position.x + sectionWidth &&
+    nodeCenterY >= section.position.y &&
+    nodeCenterY <= section.position.y + sectionHeight
+  );
+}
+
+interface UseCanvasKeyboardProps<T extends Record<string, unknown>> {
   deleteDialogOpen: boolean;
-  nodes: Node[];
+  nodes: Node<T>[];
+  setNodes: React.Dispatch<React.SetStateAction<Node<T>[]>>;
   getSelectedNoteSlugs: () => string[];
   getSelectedImageIds: () => string[];
   getSelectedSectionSlugs: () => string[];
@@ -17,9 +45,10 @@ interface UseCanvasKeyboardProps {
   onEnterPlacementMode?: (type: PlacementType) => void;
 }
 
-export function useCanvasKeyboard({
+export function useCanvasKeyboard<T extends Record<string, unknown>>({
   deleteDialogOpen,
   nodes,
+  setNodes,
   getSelectedNoteSlugs,
   getSelectedImageIds,
   getSelectedSectionSlugs,
@@ -29,7 +58,7 @@ export function useCanvasKeyboard({
   handleRedo,
   onDeleteRequest,
   onEnterPlacementMode,
-}: UseCanvasKeyboardProps) {
+}: UseCanvasKeyboardProps<T>) {
   // Track mouse position (kept for potential future use)
   const mousePositionRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
@@ -115,6 +144,34 @@ export function useCanvasKeyboard({
         return;
       }
 
+      // Enter key to select all nodes inside selected section(s)
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const selectedSections = nodes.filter(n => n.selected && n.type === 'section');
+        if (selectedSections.length > 0) {
+          e.preventDefault();
+          // Find all nodes inside any of the selected sections
+          const nodesInsideSections = new Set<string>();
+          for (const section of selectedSections) {
+            for (const node of nodes) {
+              if (isNodeInsideSection(node, section)) {
+                nodesInsideSections.add(node.id);
+              }
+            }
+          }
+          
+          if (nodesInsideSections.size > 0) {
+            // Select nodes inside sections, deselect the sections
+            setNodes(currentNodes =>
+              currentNodes.map(n => ({
+                ...n,
+                selected: nodesInsideSections.has(n.id),
+              }))
+            );
+          }
+        }
+        return;
+      }
+
       // Escape to clear selection
       if (e.key === 'Escape') {
         clearSelection();
@@ -136,5 +193,5 @@ export function useCanvasKeyboard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteDialogOpen, clearSelection, getSelectedNoteSlugs, getSelectedImageIds, getSelectedSectionSlugs, getSelectedStickySlugs, handleUndo, handleRedo, nodes, onDeleteRequest, onEnterPlacementMode]);
+  }, [deleteDialogOpen, clearSelection, getSelectedNoteSlugs, getSelectedImageIds, getSelectedSectionSlugs, getSelectedStickySlugs, handleUndo, handleRedo, nodes, setNodes, onDeleteRequest, onEnterPlacementMode]);
 }

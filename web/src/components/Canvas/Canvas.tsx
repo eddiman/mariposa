@@ -506,6 +506,7 @@ function CanvasInner({
   useCanvasKeyboard({
     deleteDialogOpen,
     nodes,
+    setNodes,
     getSelectedNoteSlugs,
     getSelectedImageIds,
     getSelectedSectionSlugs,
@@ -897,6 +898,7 @@ function CanvasInner({
         elementsSelectable={!isTouch || activeTool === 'select'}
         nodesConnectable={false}
         deleteKeyCode={null}
+        elevateNodesOnSelect={false}
       >
         <AdaptiveBackground />
         <Controls showInteractive={false} />
