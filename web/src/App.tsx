@@ -361,6 +361,11 @@ function AppContent() {
     // Find the target section to get its position (for repositioning the note)
     const targetSection = sectionSlug ? sections.find(s => s.slug === sectionSlug) : null;
     
+    // Update sidebar cache immediately for instant UI feedback
+    if (sidebarNoteUpdateRef.current) {
+      sidebarNoteUpdateRef.current(slug, { section: sectionSlug ?? undefined });
+    }
+    
     if (sectionSlug && targetSection?.position) {
       // Move to section - position note inside section bounds
       const newPosition = {
@@ -379,7 +384,12 @@ function AppContent() {
   // Handler for canvas drag-based section membership changes
   // Unlike handleNoteMoveToSection, this doesn't reposition the note (user already dragged it)
   const handleNoteSectionChange = useCallback((noteSlug: string, sectionSlug: string | null) => {
+    // Update main notes state via API
     updateNote(noteSlug, { section: sectionSlug });
+    // Also update sidebar cache immediately for instant UI feedback
+    if (sidebarNoteUpdateRef.current) {
+      sidebarNoteUpdateRef.current(noteSlug, { section: sectionSlug ?? undefined });
+    }
   }, [updateNote]);
 
   // Handler for sidebar section click (pan to section)
