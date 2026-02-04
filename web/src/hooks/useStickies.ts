@@ -105,6 +105,12 @@ export function useStickies(options: UseStickiesOptions = {}): UseStickiesReturn
     
     pendingPositions.current.delete(slug);
     
+    // Validate slug format - should be 'sticky-N'
+    if (!/^sticky-\d+$/.test(slug)) {
+      console.warn(`Invalid sticky slug format: "${slug}". Expected format: sticky-N. Skipping API call.`);
+      return;
+    }
+    
     try {
       const res = await fetch(`/api/stickies/${slug}`, {
         method: 'PUT',
@@ -181,18 +187,23 @@ export function useStickies(options: UseStickiesOptions = {}): UseStickiesReturn
   }, [fetchStickies]);
 
   const deleteSticky = useCallback(async (slug: string): Promise<boolean> => {
+    // Optimistic delete - remove from state immediately
+    setStickies(prev => prev.filter(s => s.slug !== slug));
+    
     try {
       const res = await fetch(`/api/stickies/${slug}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setStickies(prev => prev.filter(s => s.slug !== slug));
+      // 404 means it's already deleted, which is fine
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
       return true;
     } catch (err) {
       console.error('Failed to delete sticky:', err);
+      // Refetch to restore correct state on error
+      await fetchStickies();
       return false;
     }
-  }, []);
+  }, [fetchStickies]);
 
   const moveToCategory = useCallback(async (slug: string, category: string): Promise<Sticky | null> => {
     try {

@@ -104,6 +104,12 @@ export function useSections(options: UseSectionsOptions = {}): UseSectionsReturn
     
     pendingPositions.current.delete(slug);
     
+    // Validate slug format - should be 'section-N'
+    if (!/^section-\d+$/.test(slug)) {
+      console.warn(`Invalid section slug format: "${slug}". Expected format: section-N. Skipping API call.`);
+      return;
+    }
+    
     try {
       const res = await fetch(`/api/sections/${slug}`, {
         method: 'PUT',
@@ -143,6 +149,12 @@ export function useSections(options: UseSectionsOptions = {}): UseSectionsReturn
     
     pendingSizes.current.delete(slug);
     
+    // Validate slug format - should be 'section-N'
+    if (!/^section-\d+$/.test(slug)) {
+      console.warn(`Invalid section slug format: "${slug}". Expected format: section-N. Skipping API call.`);
+      return;
+    }
+    
     try {
       const res = await fetch(`/api/sections/${slug}`, {
         method: 'PUT',
@@ -173,18 +185,23 @@ export function useSections(options: UseSectionsOptions = {}): UseSectionsReturn
   }, [saveSize]);
 
   const deleteSection = useCallback(async (slug: string): Promise<boolean> => {
+    // Optimistic delete - remove from state immediately
+    setSections(prev => prev.filter(s => s.slug !== slug));
+    
     try {
       const res = await fetch(`/api/sections/${slug}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setSections(prev => prev.filter(s => s.slug !== slug));
+      // 404 means it's already deleted, which is fine
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
       return true;
     } catch (err) {
       console.error('Failed to delete section:', err);
+      // Refetch to restore correct state on error
+      await fetchSections();
       return false;
     }
-  }, []);
+  }, [fetchSections]);
 
   const moveToCategory = useCallback(async (slug: string, category: string): Promise<Section | null> => {
     try {

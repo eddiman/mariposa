@@ -219,9 +219,21 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
         onImagePositionChange(imageId, position);
       } else if (nodeId.startsWith('section-')) {
         const sectionSlug = nodeId.replace('section-', '');
+        // Validate extracted slug - section node IDs should be 'section-section-N'
+        // so after removing 'section-' prefix, we should get 'section-N'
+        if (!/^section-\d+$/.test(sectionSlug)) {
+          console.warn(`Unexpected section slug format: "${sectionSlug}" from nodeId "${nodeId}". Skipping position update.`);
+          continue;
+        }
         onSectionPositionChange(sectionSlug, position);
       } else if (nodeId.startsWith('sticky-')) {
         const stickySlug = nodeId.replace('sticky-', '');
+        // Validate extracted slug - sticky node IDs should be 'sticky-sticky-N'
+        // so after removing 'sticky-' prefix, we should get 'sticky-N'
+        if (!/^sticky-\d+$/.test(stickySlug)) {
+          console.warn(`Unexpected sticky slug format: "${stickySlug}" from nodeId "${nodeId}". Skipping position update.`);
+          continue;
+        }
         onStickyPositionChange(stickySlug, position);
       } else {
         onNotePositionChange(nodeId, position);
