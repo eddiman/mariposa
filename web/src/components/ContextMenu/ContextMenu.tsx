@@ -10,6 +10,7 @@ export interface ContextMenuItem {
   danger?: boolean;
   divider?: boolean;
   submenu?: ContextMenuItem[];
+  colorBadge?: string; // CSS color for color picker badges
 }
 
 interface ContextMenuProps {
@@ -19,11 +20,18 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
+// Detect if device is touch-only
+const isTouchDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
 export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
+  const isTouch = useRef(isTouchDevice());
   
   // Store items in a ref so native event listeners can access current values
   const itemsRef = useRef(items);
@@ -130,12 +138,20 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     };
   }, []);
 
-  const handleItemClick = useCallback((item: ContextMenuItem) => {
+  const handleItemClick = useCallback((item: ContextMenuItem, index: number) => {
     if (item.disabled) return;
-    if (item.submenu) return;
+    
+    // For touch devices, clicking on a submenu parent toggles it
+    if (item.submenu) {
+      if (isTouch.current) {
+        setOpenSubmenu(openSubmenu === index ? null : index);
+      }
+      return;
+    }
+    
     item.onClick();
     onClose();
-  }, [onClose]);
+  }, [onClose, openSubmenu]);
 
   const handleSubmenuItemClick = useCallback((item: ContextMenuItem) => {
     if (item.disabled) return;
@@ -144,6 +160,9 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   }, [onClose]);
 
   const handleItemMouseEnter = useCallback((index: number, item: ContextMenuItem) => {
+    // On touch devices, don't use hover - use click instead
+    if (isTouch.current) return;
+    
     if (item.submenu && !item.disabled) {
       setOpenSubmenu(index);
     } else {
@@ -174,7 +193,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
               <button
                 data-item-index={index}
                 className={`${styles['context-menu-item']} ${item.disabled ? styles.disabled : ''} ${item.danger ? styles.danger : ''} ${item.submenu ? styles['has-submenu'] : ''}`}
-                onClick={() => handleItemClick(item)}
+                onClick={() => handleItemClick(item, index)}
                 onMouseEnter={() => handleItemMouseEnter(index, item)}
                 disabled={item.disabled && !item.submenu}
               >
@@ -205,6 +224,12 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                         onClick={() => handleSubmenuItemClick(subItem)}
                         disabled={subItem.disabled}
                       >
+                        {subItem.colorBadge && (
+                          <span 
+                            className={styles['context-menu-color-badge']} 
+                            style={{ backgroundColor: subItem.colorBadge }}
+                          />
+                        )}
                         {subItem.icon && <span className={styles['context-menu-icon']}>{subItem.icon}</span>}
                         <span className={styles['context-menu-label']}>{subItem.label}</span>
                         {subItem.shortcut && <span className={styles['context-menu-shortcut']}>{subItem.shortcut}</span>}

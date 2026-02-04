@@ -37,7 +37,7 @@ export function AdaptiveBackground() {
       variant={BackgroundVariant.Dots}
       gap={gap}
       size={size}
-      color="#d2d1cc"
+      color="var(--color-grid)"
     />
   );
 }

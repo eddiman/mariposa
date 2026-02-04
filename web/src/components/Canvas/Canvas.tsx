@@ -30,6 +30,7 @@ import { useCanvasNodeDrag } from '../../hooks/useCanvasNodeDrag';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { isTouchDevice } from '../../utils/platform.js';
 import type { Note, Position, CanvasImage, CategoryMeta, CanvasTool, Section, Sticky, StickyColor } from '../../types';
+import type { PlacementType } from '../../contexts/PlacementContext.js';
 import type { Settings } from '../../hooks/useSettings';
 import styles from './Canvas.module.css';
 
@@ -74,6 +75,7 @@ interface CanvasProps {
   onSectionPositionChange: (slug: string, position: Position) => void;
   onSectionResize: (slug: string, width: number, height: number) => void;
   onSectionRename: (slug: string, name: string) => void;
+  onSectionColorChange?: (slug: string, color: StickyColor) => void;
   onSectionsDelete?: (slugs: string[]) => Promise<void>;
   // Sticky handlers
   onStickyCreate?: (position: Position) => void;
@@ -85,6 +87,7 @@ interface CanvasProps {
   onUpdateNodePositionsRef?: (handler: (updates: NodePositionUpdate[]) => void) => void;
   onFocusOnNodeRef?: (handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => void;
   onHistoryChange?: (handle: CanvasHistoryHandle) => void;
+  onEnterPlacementMode?: (type: PlacementType) => void;
   loading: boolean;
   settings: Settings;
 }
@@ -147,6 +150,7 @@ function CanvasInner({
   onSectionPositionChange,
   onSectionResize,
   onSectionRename,
+  onSectionColorChange,
   onSectionsDelete,
   onStickyCreate,
   onStickyPositionChange,
@@ -156,6 +160,7 @@ function CanvasInner({
   onSelectionChange,
   onUpdateNodePositionsRef,
   onFocusOnNodeRef,
+  onEnterPlacementMode,
   onHistoryChange,
   loading,
   settings,
@@ -352,6 +357,8 @@ function CanvasInner({
   useEffect(() => {
     const noteDataMap = new Map(notes.map(n => [n.slug, n]));
     const imageDataMap = new Map(images.map(i => [`image-${i.id}`, i]));
+    const sectionDataMap = new Map(sections.map(s => [`section-${s.slug}`, s]));
+    const stickyDataMap = new Map(stickies.map(s => [`sticky-${s.slug}`, s]));
 
     setNodes(currentNodes =>
       currentNodes.map(node => {
@@ -366,11 +373,27 @@ function CanvasInner({
           if (imageData) {
             return { ...node, data: { ...node.data, ...imageData } };
           }
+        } else if (node.type === 'section') {
+          const sectionData = sectionDataMap.get(node.id);
+          if (sectionData) {
+            const currentData = node.data as SectionNodeData;
+            if (sectionData.name !== currentData.name || sectionData.color !== currentData.color) {
+              return { ...node, data: { ...node.data, ...sectionData } };
+            }
+          }
+        } else if (node.type === 'sticky') {
+          const stickyData = stickyDataMap.get(node.id);
+          if (stickyData) {
+            const currentData = node.data as StickyNodeData;
+            if (stickyData.text !== currentData.text || stickyData.color !== currentData.color) {
+              return { ...node, data: { ...node.data, ...stickyData } };
+            }
+          }
         }
         return node;
       })
     );
-  }, [notes, images, setNodes]);
+  }, [notes, images, sections, stickies, setNodes]);
 
   // Sync isPanMode when tool changes
   useEffect(() => {
@@ -447,6 +470,7 @@ function CanvasInner({
     onAddSection: onSectionCreate,
     onAddSticky: onStickyCreate,
     onStickyColorChange,
+    onSectionColorChange,
     onNoteMoveToCategory,
     onImageMoveToCategory,
     onDeleteRequest: handleDeleteRequest,
@@ -490,9 +514,7 @@ function CanvasInner({
     handleUndo,
     handleRedo,
     onDeleteRequest: handleDeleteRequest,
-    onAddSection: onSectionCreate,
-    onAddSticky: onStickyCreate,
-    screenToFlowPosition,
+    onEnterPlacementMode,
   });
 
   // Track shift key

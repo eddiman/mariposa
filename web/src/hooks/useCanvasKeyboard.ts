@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Node } from '@xyflow/react';
 import { setModuleClipboard } from './useCanvasClipboard';
-import type { Position } from '../types';
+import type { PlacementType } from '../contexts/PlacementContext.js';
 
 interface UseCanvasKeyboardProps {
   deleteDialogOpen: boolean;
@@ -14,9 +14,7 @@ interface UseCanvasKeyboardProps {
   handleUndo: () => void;
   handleRedo: () => void;
   onDeleteRequest: (noteSlugs: string[], imageIds: string[], sectionSlugs?: string[], stickySlugs?: string[]) => void;
-  onAddSection?: (position: Position) => void;
-  onAddSticky?: (position: Position) => void;
-  screenToFlowPosition: (position: { x: number; y: number }) => Position;
+  onEnterPlacementMode?: (type: PlacementType) => void;
 }
 
 export function useCanvasKeyboard({
@@ -30,11 +28,9 @@ export function useCanvasKeyboard({
   handleUndo,
   handleRedo,
   onDeleteRequest,
-  onAddSection,
-  onAddSticky,
-  screenToFlowPosition,
+  onEnterPlacementMode,
 }: UseCanvasKeyboardProps) {
-  // Track mouse position for S and T shortcuts
+  // Track mouse position (kept for potential future use)
   const mousePositionRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
   useEffect(() => {
@@ -101,22 +97,20 @@ export function useCanvasKeyboard({
         return;
       }
 
-      // S key to add section at cursor position
+      // S key to enter section placement mode
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        if (onAddSection) {
-          const flowPosition = screenToFlowPosition(mousePositionRef.current);
-          onAddSection(flowPosition);
+        if (onEnterPlacementMode) {
+          onEnterPlacementMode('section');
         }
         return;
       }
 
-      // T key to add sticky at cursor position
+      // T key to enter sticky placement mode
       if (e.key === 't' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        if (onAddSticky) {
-          const flowPosition = screenToFlowPosition(mousePositionRef.current);
-          onAddSticky(flowPosition);
+        if (onEnterPlacementMode) {
+          onEnterPlacementMode('sticky');
         }
         return;
       }
@@ -142,5 +136,5 @@ export function useCanvasKeyboard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteDialogOpen, clearSelection, getSelectedNoteSlugs, getSelectedImageIds, getSelectedSectionSlugs, getSelectedStickySlugs, handleUndo, handleRedo, nodes, onDeleteRequest, onAddSection, onAddSticky, screenToFlowPosition]);
+  }, [deleteDialogOpen, clearSelection, getSelectedNoteSlugs, getSelectedImageIds, getSelectedSectionSlugs, getSelectedStickySlugs, handleUndo, handleRedo, nodes, onDeleteRequest, onEnterPlacementMode]);
 }

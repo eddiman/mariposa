@@ -1,11 +1,15 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 
+export type PlacementType = 'note' | 'section' | 'sticky';
+
 interface PlacementContextValue {
   // State
   isPlacementMode: boolean;
+  placementType: PlacementType | null;
   isCreating: boolean;
   
   // Actions
+  enterPlacementMode: (type: PlacementType) => void;
   togglePlacementMode: () => void;
   exitPlacementMode: () => void;
   setIsCreating: (creating: boolean) => void;
@@ -19,14 +23,27 @@ interface PlacementProviderProps {
 
 export function PlacementProvider({ children }: PlacementProviderProps) {
   const [isPlacementMode, setIsPlacementMode] = useState(false);
+  const [placementType, setPlacementType] = useState<PlacementType | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const togglePlacementMode = useCallback(() => {
-    setIsPlacementMode(prev => !prev);
+  const enterPlacementMode = useCallback((type: PlacementType) => {
+    setPlacementType(type);
+    setIsPlacementMode(true);
   }, []);
+
+  const togglePlacementMode = useCallback(() => {
+    if (isPlacementMode) {
+      setIsPlacementMode(false);
+      setPlacementType(null);
+    } else {
+      setPlacementType('note');
+      setIsPlacementMode(true);
+    }
+  }, [isPlacementMode]);
 
   const exitPlacementMode = useCallback(() => {
     setIsPlacementMode(false);
+    setPlacementType(null);
   }, []);
 
   // Escape key to exit placement mode
@@ -34,6 +51,7 @@ export function PlacementProvider({ children }: PlacementProviderProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isPlacementMode) {
         setIsPlacementMode(false);
+        setPlacementType(null);
       }
     };
     
@@ -43,7 +61,9 @@ export function PlacementProvider({ children }: PlacementProviderProps) {
 
   const value: PlacementContextValue = {
     isPlacementMode,
+    placementType,
     isCreating,
+    enterPlacementMode,
     togglePlacementMode,
     exitPlacementMode,
     setIsCreating,

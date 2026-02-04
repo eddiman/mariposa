@@ -1,11 +1,12 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react';
-import { Handle, Position } from '@xyflow/react';
-import type { Section } from '../../types';
+import { Handle, Position, useViewport } from '@xyflow/react';
+import type { Section, StickyColor } from '../../types';
 import styles from './SectionNode.module.css';
 
 export interface SectionNodeData extends Section {
   onResize?: (slug: string, width: number, height: number) => void;
   onRename?: (slug: string, name: string) => void;
+  onColorChange?: (slug: string, color: StickyColor) => void;
   isPanMode?: boolean;
   [key: string]: unknown;
 }
@@ -19,6 +20,7 @@ type ResizeCorner = 'tl' | 'tr' | 'bl' | 'br';
 
 function SectionNodeComponent({ data, selected }: SectionNodeProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
+  const { zoom } = useViewport();
   const [isResizing, setIsResizing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(data.name);
@@ -26,6 +28,9 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
     width: data.width || 300,
     height: data.height || 200,
   });
+
+  // Calculate inverse scale for labels and handles to maintain consistent size
+  const inverseScale = 1 / zoom;
 
   // Refs for resize handling
   const resizeStartRef = useRef<{
@@ -67,8 +72,8 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!resizeStartRef.current) return;
 
-      const dx = moveEvent.clientX - resizeStartRef.current.x;
-      const dy = moveEvent.clientY - resizeStartRef.current.y;
+      const dx = (moveEvent.clientX - resizeStartRef.current.x) / zoom;
+      const dy = (moveEvent.clientY - resizeStartRef.current.y) / zoom;
       const { corner: c, width: startWidth, height: startHeight } = resizeStartRef.current;
 
       let newWidth = startWidth;
@@ -106,7 +111,68 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [data.isPanMode, data.onResize, data.slug]);
+  }, [data.isPanMode, data.onResize, data.slug, zoom]);
+
+  // Touch event handler for resize
+  const handleTouchStart = useCallback((e: React.TouchEvent, corner: ResizeCorner) => {
+    if (data.isPanMode) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    resizeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      width: currentSizeRef.current.width,
+      height: currentSizeRef.current.height,
+      corner,
+    };
+    setIsResizing(true);
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (!resizeStartRef.current) return;
+      moveEvent.preventDefault();
+
+      const moveTouch = moveEvent.touches[0];
+      const dx = (moveTouch.clientX - resizeStartRef.current.x) / zoom;
+      const dy = (moveTouch.clientY - resizeStartRef.current.y) / zoom;
+      const { corner: c, width: startWidth, height: startHeight } = resizeStartRef.current;
+
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+
+      if (c === 'br') {
+        newWidth = Math.max(100, startWidth + dx);
+        newHeight = Math.max(100, startHeight + dy);
+      } else if (c === 'bl') {
+        newWidth = Math.max(100, startWidth - dx);
+        newHeight = Math.max(100, startHeight + dy);
+      } else if (c === 'tr') {
+        newWidth = Math.max(100, startWidth + dx);
+        newHeight = Math.max(100, startHeight - dy);
+      } else if (c === 'tl') {
+        newWidth = Math.max(100, startWidth - dx);
+        newHeight = Math.max(100, startHeight - dy);
+      }
+
+      setCurrentSize({ width: newWidth, height: newHeight });
+      currentSizeRef.current = { width: newWidth, height: newHeight };
+    };
+
+    const handleTouchEnd = () => {
+      if (resizeStartRef.current && data.onResize) {
+        data.onResize(data.slug, currentSizeRef.current.width, currentSizeRef.current.height);
+      }
+      resizeStartRef.current = null;
+      setIsResizing(false);
+
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+  }, [data.isPanMode, data.onResize, data.slug, zoom]);
 
   const handleNameClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -132,20 +198,28 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
     }
   }, [data.name]);
 
+  // Get the CSS color class if using a preset color
+  const colorClass = data.color && styles[data.color as StickyColor] ? styles[data.color as StickyColor] : '';
+
   return (
     <div
       ref={nodeRef}
-      className={`${styles['section-node']} ${selected ? styles.selected : ''}`}
+      className={`${styles['section-node']} ${colorClass} ${selected ? styles.selected : ''}`}
       style={{
         width: currentSize.width,
         height: currentSize.height,
-        backgroundColor: data.color || undefined,
       }}
     >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
 
-      {/* Section name label */}
-      <div className={styles['section-label']}>
+      {/* Section name label - scales inversely with zoom */}
+      <div 
+        className={styles['section-label']}
+        style={{
+          transform: `scale(${inverseScale})`,
+          transformOrigin: 'top left',
+        }}
+      >
         {isEditing ? (
           <input
             type="text"
@@ -164,24 +238,44 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
         )}
       </div>
 
-      {/* Corner resize handles - only visible when selected */}
+      {/* Corner resize handles - scale inversely with zoom, always visible on mobile when selected */}
       {selected && (
         <>
           <div
             className={`${styles.handle} ${styles['handle-tl']} nodrag nopan`}
+            style={{
+              transform: `scale(${inverseScale})`,
+              transformOrigin: 'center',
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'tl')}
+            onTouchStart={(e) => handleTouchStart(e, 'tl')}
           />
           <div
             className={`${styles.handle} ${styles['handle-tr']} nodrag nopan`}
+            style={{
+              transform: `scale(${inverseScale})`,
+              transformOrigin: 'center',
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'tr')}
+            onTouchStart={(e) => handleTouchStart(e, 'tr')}
           />
           <div
             className={`${styles.handle} ${styles['handle-bl']} nodrag nopan`}
+            style={{
+              transform: `scale(${inverseScale})`,
+              transformOrigin: 'center',
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'bl')}
+            onTouchStart={(e) => handleTouchStart(e, 'bl')}
           />
           <div
             className={`${styles.handle} ${styles['handle-br']} nodrag nopan`}
+            style={{
+              transform: `scale(${inverseScale})`,
+              transformOrigin: 'center',
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'br')}
+            onTouchStart={(e) => handleTouchStart(e, 'br')}
           />
         </>
       )}

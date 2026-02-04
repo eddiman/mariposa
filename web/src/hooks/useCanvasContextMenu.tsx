@@ -25,6 +25,7 @@ interface UseCanvasContextMenuProps {
   onAddSection?: (position: Position) => void;
   onAddSticky?: (position: Position) => void;
   onStickyColorChange?: (slug: string, color: StickyColor) => void;
+  onSectionColorChange?: (slug: string, color: StickyColor) => void;
   onNoteMoveToCategory?: (slug: string, category: string) => Promise<unknown>;
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
   onDeleteRequest: (noteSlugs: string[], imageIds: string[], sectionSlugs?: string[], stickySlugs?: string[]) => void;
@@ -45,6 +46,7 @@ export function useCanvasContextMenu({
   onAddSection,
   onAddSticky,
   onStickyColorChange,
+  onSectionColorChange,
   onNoteMoveToCategory,
   onImageMoveToCategory,
   onDeleteRequest,
@@ -210,23 +212,38 @@ export function useCanvasContextMenu({
         })),
       ];
 
-      // Build "Change Color" submenu for stickies
-      const stickyColors: { label: string; value: StickyColor }[] = [
-        { label: 'Yellow', value: 'yellow' },
-        { label: 'Pink', value: 'pink' },
-        { label: 'Blue', value: 'blue' },
-        { label: 'Green', value: 'green' },
-        { label: 'Purple', value: 'purple' },
-        { label: 'Orange', value: 'orange' },
-        { label: 'Mint', value: 'mint' },
-        { label: 'Peach', value: 'peach' },
+      // Build "Change Color" submenu for stickies and sections
+      const stickyColors: { label: string; value: StickyColor; hex: string }[] = [
+        { label: 'Yellow', value: 'yellow', hex: '#fff9c4' },
+        { label: 'Pink', value: 'pink', hex: '#f8bbd0' },
+        { label: 'Blue', value: 'blue', hex: '#bbdefb' },
+        { label: 'Green', value: 'green', hex: '#c8e6c9' },
+        { label: 'Purple', value: 'purple', hex: '#e1bee7' },
+        { label: 'Orange', value: 'orange', hex: '#ffe0b2' },
+        { label: 'Mint', value: 'mint', hex: '#b2dfdb' },
+        { label: 'Peach', value: 'peach', hex: '#ffccbc' },
       ];
-      const colorItems: ContextMenuItem[] = stickyColors.map(({ label, value }) => ({
+      
+      // Color items for stickies
+      const stickyColorItems: ContextMenuItem[] = stickyColors.map(({ label, value, hex }) => ({
         label,
+        colorBadge: hex,
         onClick: () => {
           for (const n of selectedStickies) {
             const stickySlug = n.id.replace('sticky-', '');
             if (onStickyColorChange) onStickyColorChange(stickySlug, value);
+          }
+        },
+      }));
+      
+      // Color items for sections
+      const sectionColorItems: ContextMenuItem[] = stickyColors.map(({ label, value, hex }) => ({
+        label,
+        colorBadge: hex,
+        onClick: () => {
+          for (const n of selectedSections) {
+            const sectionSlug = n.id.replace('section-', '');
+            if (onSectionColorChange) onSectionColorChange(sectionSlug, value);
           }
         },
       }));
@@ -277,7 +294,25 @@ export function useCanvasContextMenu({
               </svg>
             ),
             onClick: () => {},
-            submenu: colorItems,
+            submenu: stickyColorItems,
+          }
+        );
+      }
+
+      // Add "Change Color" for sections
+      if (selectedSections.length > 0 && onSectionColorChange) {
+        menuItems.push(
+          { label: '', onClick: () => {}, divider: true },
+          {
+            label: 'Change Color',
+            icon: (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 2a10 10 0 0110 10" />
+              </svg>
+            ),
+            onClick: () => {},
+            submenu: sectionColorItems,
           }
         );
       }
@@ -309,7 +344,7 @@ export function useCanvasContextMenu({
 
       return menuItems;
     }
-  }, [contextMenu, canUndo, canRedo, handleUndo, handleRedo, handleCopyNodes, handlePasteNodes, handleAddImage, nodes, categories, onNoteMoveToCategory, onImageMoveToCategory, onPlacementClick, onAddSection, onAddSticky, onStickyColorChange, onDeleteRequest]);
+  }, [contextMenu, canUndo, canRedo, handleUndo, handleRedo, handleCopyNodes, handlePasteNodes, handleAddImage, nodes, categories, onNoteMoveToCategory, onImageMoveToCategory, onPlacementClick, onAddSection, onAddSticky, onStickyColorChange, onSectionColorChange, onDeleteRequest]);
 
   return {
     contextMenu,

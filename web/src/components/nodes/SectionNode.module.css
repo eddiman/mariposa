@@ -14,6 +14,47 @@
   border-style: solid;
 }
 
+/* Section colors (same as sticky) */
+.yellow {
+  background: rgba(255, 249, 196, 0.5);
+  border-color: rgba(255, 235, 59, 0.5);
+}
+
+.pink {
+  background: rgba(248, 187, 208, 0.5);
+  border-color: rgba(233, 30, 99, 0.3);
+}
+
+.blue {
+  background: rgba(187, 222, 251, 0.5);
+  border-color: rgba(33, 150, 243, 0.3);
+}
+
+.green {
+  background: rgba(200, 230, 201, 0.5);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.purple {
+  background: rgba(225, 190, 231, 0.5);
+  border-color: rgba(156, 39, 176, 0.3);
+}
+
+.orange {
+  background: rgba(255, 224, 178, 0.5);
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+.mint {
+  background: rgba(178, 223, 219, 0.5);
+  border-color: rgba(0, 150, 136, 0.3);
+}
+
+.peach {
+  background: rgba(255, 204, 188, 0.5);
+  border-color: rgba(255, 87, 34, 0.3);
+}
+
 /* Section label */
 .section-label {
   position: absolute;
@@ -63,6 +104,36 @@
   border: 2px solid var(--color-card);
   border-radius: 2px;
   z-index: 10;
+  touch-action: none;
+}
+
+/* Make handles larger on touch devices */
+@media (hover: none) {
+  .handle {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+  
+  .handle-tl {
+    top: -10px;
+    left: -10px;
+  }
+  
+  .handle-tr {
+    top: -10px;
+    right: -10px;
+  }
+  
+  .handle-bl {
+    bottom: -10px;
+    left: -10px;
+  }
+  
+  .handle-br {
+    bottom: -10px;
+    right: -10px;
+  }
 }
 
 .handle-tl {

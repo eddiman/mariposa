@@ -262,7 +262,7 @@ export function NoteEditor({ slug, originRect, categories, initialNote, sidebarO
     
     return {
       transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
-      borderRadius: '16px',
+      borderRadius: 'var(--radius-lg)',
     };
   };
 

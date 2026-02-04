@@ -14,10 +14,18 @@ interface StickyNodeProps {
   selected?: boolean;
 }
 
+// Detect if device is touch-only
+const isTouchDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
 function StickyNodeComponent({ data, selected }: StickyNodeProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(data.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isTouch = useRef(isTouchDevice());
+  const lastTapRef = useRef<number>(0);
 
   // Sync text from data
   useEffect(() => {
@@ -34,6 +42,7 @@ function StickyNodeComponent({ data, selected }: StickyNodeProps) {
     }
   }, [isEditing]);
 
+  // Handle double-click for desktop
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (!data.isPanMode) {
@@ -41,9 +50,28 @@ function StickyNodeComponent({ data, selected }: StickyNodeProps) {
     }
   }, [data.isPanMode]);
 
+  // Handle touch for mobile - single tap when selected, double tap otherwise
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (data.isPanMode || isEditing) return;
+    
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+    
+    // If selected, single tap to edit
+    // If not selected, require double tap
+    if (selected || timeSinceLastTap < 300) {
+      e.stopPropagation();
+      e.preventDefault();
+      setIsEditing(true);
+    }
+    
+    lastTapRef.current = now;
+  }, [data.isPanMode, selected, isEditing]);
+
   const handleBlur = useCallback(() => {
     setIsEditing(false);
-    if (editText !== data.text && data.onTextChange) {
+    // Always save the text when exiting edit mode
+    if (data.onTextChange && editText !== data.text) {
       data.onTextChange(data.slug, editText);
     }
   }, [editText, data.text, data.onTextChange, data.slug]);
@@ -61,11 +89,13 @@ function StickyNodeComponent({ data, selected }: StickyNodeProps) {
   }, [data.text]);
 
   const colorClass = styles[data.color as StickyColor] || styles.yellow;
+  const placeholderText = isTouch.current ? 'Tap to edit' : 'Double-click to edit';
 
   return (
     <div
       className={`${styles['sticky-node']} ${colorClass} ${selected ? styles.selected : ''}`}
       onDoubleClick={handleDoubleClick}
+      onTouchEnd={handleTouchEnd}
     >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
 
@@ -78,11 +108,12 @@ function StickyNodeComponent({ data, selected }: StickyNodeProps) {
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
           placeholder="Enter text..."
         />
       ) : (
         <div className={styles['sticky-text']}>
-          {data.text || 'Double-click to edit'}
+          {data.text || placeholderText}
         </div>
       )}
 

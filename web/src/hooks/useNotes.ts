@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import type { Note, NotesResponse, NoteCreateInput, NoteUpdateInput, Position } from '../types';
 
 // Debounce helper for position updates
-function debounce<T extends (...args: Parameters<T>) => void>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function debounce<T extends (...args: any[]) => void>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {

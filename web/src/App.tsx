@@ -6,6 +6,8 @@ import { Toolbar } from './components/Toolbar';
 import { SelectionToolbar } from './components/SelectionToolbar';
 import { ToolSwitcher } from './components/ToolSwitcher';
 import { GhostNote } from './components/GhostNote';
+import { GhostSection } from './components/GhostSection';
+import { GhostSticky } from './components/GhostSticky';
 import { PlacementHint } from './components/PlacementHint';
 
 // Lazy load dialogs and editor (not needed on initial render)
@@ -58,7 +60,7 @@ function AppContent() {
     prepareEditorOpen, 
     clearEditorState,
   } = useEditor();
-  const { isPlacementMode, isCreating, togglePlacementMode, exitPlacementMode, setIsCreating } = usePlacement();
+  const { isPlacementMode, placementType, isCreating, enterPlacementMode, exitPlacementMode, setIsCreating } = usePlacement();
   const { 
     isOpen: categoryDialogOpen, 
     mode: categoryDialogMode, 
@@ -252,6 +254,10 @@ function AppContent() {
     updateSection(slug, { name });
   }, [updateSection]);
 
+  const handleSectionColorChange = useCallback((slug: string, color: StickyColor) => {
+    updateSection(slug, { color });
+  }, [updateSection]);
+
   const handleSectionsDelete = useCallback(async (slugs: string[]) => {
     await Promise.all(slugs.map(slug => deleteSection(slug)));
   }, [deleteSection]);
@@ -278,33 +284,43 @@ function AppContent() {
     await Promise.all(slugs.map(slug => deleteSticky(slug)));
   }, [deleteSticky]);
 
-  // Handle canvas click during placement mode - create note at position
+  // Handle canvas click during placement mode - create item at position based on type
   const handlePlacementClick = useCallback(async (position: Position) => {
-    if (isCreating) return;
-    setIsCreating(true);
-    exitPlacementMode();
+    if (isCreating || !placementType) return;
     
-    const noteCategory = currentSpace || 'all-notes';
-    const newNote = await createNote({
-      title: 'Untitled Note',
-      content: '',
-      category: noteCategory,
-      position,
-    });
+    const category = currentSpace || 'all-notes';
     
-    setIsCreating(false);
-    
-    if (newNote) {
-      // Open the new note for editing
-      prepareEditorOpen({
-        x: window.innerWidth / 2 - 100,
-        y: window.innerHeight / 2 - 141,
-        width: 200,
-        height: 283,
-      }, newNote);
-      setFocusedNoteSlug(newNote.slug, noteCategory);
+    if (placementType === 'note') {
+      setIsCreating(true);
+      exitPlacementMode();
+      
+      const newNote = await createNote({
+        title: 'Untitled Note',
+        content: '',
+        category,
+        position,
+      });
+      
+      setIsCreating(false);
+      
+      if (newNote) {
+        // Open the new note for editing
+        prepareEditorOpen({
+          x: window.innerWidth / 2 - 100,
+          y: window.innerHeight / 2 - 141,
+          width: 200,
+          height: 283,
+        }, newNote);
+        setFocusedNoteSlug(newNote.slug, category);
+      }
+    } else if (placementType === 'section') {
+      exitPlacementMode();
+      await createSection({ position, category });
+    } else if (placementType === 'sticky') {
+      exitPlacementMode();
+      await createSticky({ position, category });
     }
-  }, [createNote, currentSpace, isCreating, setIsCreating, exitPlacementMode, prepareEditorOpen, setFocusedNoteSlug]);
+  }, [createNote, createSection, createSticky, currentSpace, isCreating, placementType, setIsCreating, exitPlacementMode, prepareEditorOpen, setFocusedNoteSlug]);
 
   // Category handlers
   const handleCreateCategory = useCallback(async (slug: string, displayName: string) => {
@@ -384,6 +400,7 @@ function AppContent() {
           onSectionPositionChange={handleSectionPositionChange}
           onSectionResize={handleSectionResize}
           onSectionRename={handleSectionRename}
+          onSectionColorChange={handleSectionColorChange}
           onSectionsDelete={handleSectionsDelete}
           onStickyCreate={handleStickyCreate}
           onStickyPositionChange={handleStickyPositionChange}
@@ -393,6 +410,7 @@ function AppContent() {
           onSelectionChange={handleSelectionChange}
           onUpdateNodePositionsRef={handleUpdateNodePositionsRef}
           onFocusOnNodeRef={handleFocusOnNodeRef}
+          onEnterPlacementMode={enterPlacementMode}
           onHistoryChange={handleHistoryChange}
           loading={loading}
           settings={settings}
@@ -401,10 +419,14 @@ function AppContent() {
       
       <Toolbar 
         isPlacementMode={isPlacementMode}
-        onTogglePlacementMode={togglePlacementMode}
+        placementType={placementType}
+        onEnterPlacementMode={enterPlacementMode}
+        onExitPlacementMode={exitPlacementMode}
       />
       
-      <GhostNote visible={isPlacementMode} />
+      <GhostNote visible={isPlacementMode && placementType === 'note'} />
+      <GhostSection visible={isPlacementMode && placementType === 'section'} />
+      <GhostSticky visible={isPlacementMode && placementType === 'sticky'} />
       <PlacementHint visible={isPlacementMode} />
       
       {showToolSwitcher && (
