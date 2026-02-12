@@ -21,6 +21,7 @@ import { Dialog } from '../Dialog';
 import { SnapGuides } from '../SnapGuides';
 import { AdaptiveBackground } from '../AdaptiveBackground';
 import { ContextMenu } from '../ContextMenu';
+import { CanvasLoader } from './CanvasLoader';
 import { useSnapToGuides } from '../../hooks/useSnapToGuides';
 import { useCanvasHistory, type NodeSnapshot } from '../../hooks/useCanvasHistory';
 import { useCanvasClipboard } from '../../hooks/useCanvasClipboard';
@@ -58,7 +59,7 @@ interface CanvasProps {
   categories: CategoryMeta[];
   activeTool?: CanvasTool;
   isPlacementMode?: boolean;
-  onPlacementClick?: (position: Position) => void;
+  onPlacementClick?: (position: Position, nodes?: Node<CanvasNodeData>[]) => void;
   onNoteOpen: (slug: string, category: string, originRect: OriginRect) => void;
   onNotePositionChange: (slug: string, position: Position) => void;
   onImagePositionChange: (id: string, position: Position) => void;
@@ -72,7 +73,7 @@ interface CanvasProps {
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
   onNoteSectionChange?: (noteSlug: string, sectionSlug: string | null) => void;
   // Section handlers
-  onSectionCreate?: (position: Position) => void;
+  onSectionCreate?: (position: Position, nodes?: Node<CanvasNodeData>[]) => void;
   onSectionPositionChange: (slug: string, position: Position) => void;
   onSectionResize: (slug: string, width: number, height: number) => void;
   onSectionRename: (slug: string, name: string) => void;
@@ -87,7 +88,6 @@ interface CanvasProps {
   onSelectionChange?: (selectedNodes: Node<CanvasNodeData>[]) => void;
   onUpdateNodePositionsRef?: (handler: (updates: NodePositionUpdate[]) => void) => void;
   onFocusOnNodeRef?: (handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => void;
-  onHistoryChange?: (handle: CanvasHistoryHandle) => void;
   onEnterPlacementMode?: (type: PlacementType) => void;
   loading: boolean;
   settings: Settings;
@@ -179,6 +179,8 @@ function CanvasInner({
   const [isAnimating, setIsAnimating] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [pasteInputPosition, setPasteInputPosition] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
+  const [showLoader, setShowLoader] = useState(loading);
+  const [isEntering, setIsEntering] = useState(false);
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pasteTargetRef = useRef<HTMLInputElement>(null);
@@ -442,8 +444,16 @@ function CanvasInner({
     setNodes(currentNodes => currentNodes.map(n => ({ ...n, selected: false })));
   }, [setNodes]);
 
+  // Handle section creation with nodes context
+  const handleSectionCreateWithNodes = useCallback((position: Position) => {
+    if (onSectionCreate) {
+      const allNodes = getNodes();
+      onSectionCreate(position, allNodes);
+    }
+  }, [onSectionCreate, getNodes]);
+
   // Context menu hook
-  const contextMenuHook = useCanvasContextMenu({
+  const contextMenuHook = useCanvasContextMenu<CanvasNodeData>({
     nodes,
     categories,
     screenToFlowPosition,
@@ -469,7 +479,7 @@ function CanvasInner({
     },
     handleAddImage,
     onPlacementClick,
-    onAddSection: onSectionCreate,
+    onAddSection: handleSectionCreateWithNodes,
     onAddSticky: onStickyCreate,
     onStickyColorChange,
     onSectionColorChange,
@@ -809,11 +819,12 @@ function CanvasInner({
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (isPlacementMode && onPlacementClick) {
       const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      onPlacementClick(flowPosition);
+      const allNodes = getNodes();
+      onPlacementClick(flowPosition, allNodes);
       return;
     }
     clearSelection();
-  }, [isPlacementMode, onPlacementClick, screenToFlowPosition, clearSelection]);
+  }, [isPlacementMode, onPlacementClick, screenToFlowPosition, clearSelection, getNodes]);
 
   // Handle node context menu
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node<CanvasNodeData>) => {
@@ -857,22 +868,30 @@ function CanvasInner({
     setPasteInputPosition(prev => ({ ...prev, visible: false }));
   }, [onImagePaste, clipboard, contextMenuHook]);
 
-  if (loading) {
-    return (
-      <div className={styles['canvas-loading']}>
-        <p>Loading notes...</p>
-      </div>
-    );
-  }
+  // Handle loader transition complete
+  const handleLoaderTransitionComplete = useCallback(() => {
+    setShowLoader(false);
+    setIsEntering(true);
+    // Remove entering class after animation completes
+    setTimeout(() => setIsEntering(false), 400);
+  }, []);
 
   const containerClasses = [
     styles['canvas-container'],
     isTouch && activeTool === 'pan' ? styles['pan-mode'] : '',
     isAnimating ? styles['animating'] : '',
+    isEntering ? styles['canvas-container--entering'] : '',
   ].filter(Boolean).join(' ');
 
   return (
     <div className={containerClasses} ref={touchGestures.setCanvasContainerRef}>
+      {showLoader && (
+        <CanvasLoader
+          isLoading={loading}
+          onTransitionComplete={handleLoaderTransitionComplete}
+        />
+      )}
+      
       <ReactFlow
         nodes={nodes}
         edges={[]}

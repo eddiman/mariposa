@@ -14,6 +14,8 @@ interface UseSidebarNotesOptions {
   setIsCreating: (creating: boolean) => void;
   prepareEditorOpen: (rect: OriginRect, note: Note | null) => void;
   createNote: (input: { title: string; content: string; category: string; position: Position }) => Promise<Note | null>;
+  refetchCategories?: () => Promise<void>;
+  setRefetchTrigger?: (trigger: number) => void;
 }
 
 interface UseSidebarNotesReturn {
@@ -34,6 +36,7 @@ export function useSidebarNotes({
   setIsCreating,
   prepareEditorOpen,
   createNote,
+  refetchCategories,
 }: UseSidebarNotesOptions): UseSidebarNotesReturn {
   const focusOnNodeRef = useRef<((nodeId: string, options?: FocusOnNodeOptions) => void) | null>(null);
 
@@ -127,10 +130,21 @@ export function useSidebarNotes({
     
     if (newNote) {
       openNoteInEditor(newNote.slug, category, newNote);
+      
+      // Refresh category metadata to update note counts in sidebar
+      if (refetchCategories) {
+        await refetchCategories();
+      }
+      
+      // Invalidate sidebar cache to force refetch of note lists
+      if (setRefetchTrigger) {
+        setRefetchTrigger(prev => prev + 1);
+      }
+      
       return newNote;
     }
     return null;
-  }, [isCreating, setIsCreating, createNote, openNoteInEditor]);
+  }, [isCreating, setIsCreating, createNote, openNoteInEditor, refetchCategories]);
 
   return {
     focusOnNodeRef,

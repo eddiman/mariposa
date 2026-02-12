@@ -25,6 +25,7 @@ interface SidebarProps {
   onSectionClick?: (sectionSlug: string) => void;
   onNoteUpdateRef?: (handler: (slug: string, updates: Partial<NoteMeta>) => void) => void;
   loading?: boolean;
+  refetchTrigger?: number;
 }
 
 export function Sidebar({
@@ -44,6 +45,7 @@ export function Sidebar({
   onSectionClick,
   onNoteUpdateRef,
   loading = false,
+  refetchTrigger = 0,
 }: SidebarProps) {
   // View state: null = main view, 'all-notes' = all notes view, string = category name for category view
   const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null);
@@ -60,7 +62,8 @@ export function Sidebar({
   }, [activeCategoryView, previousCategoryView]);
   
   const { getNotes, getGroupedNotes, isLoading, addNoteToCategory, updateNoteInCategory } = useCategoryNotes(
-    expandedCategoriesSet
+    expandedCategoriesSet,
+    { refetchTrigger, currentSpace }
   );
 
   // Expose updateNoteInCategory to parent via ref callback
@@ -117,6 +120,7 @@ export function Sidebar({
 
   const handleCategoryTitleClick = useCallback((categoryName: string | null) => {
     onSpaceChange(categoryName);
+    setActiveCategoryView(categoryName);
     // Auto-close sidebar on mobile after navigation
     if (isMobileViewport() && open) {
       onToggle();
@@ -125,6 +129,7 @@ export function Sidebar({
 
   const handleNoteTitleClick = useCallback((category: string, slug: string) => {
     onNoteClick(category, slug);
+
     // Auto-close sidebar on mobile after navigation
     if (isMobileViewport() && open) {
       onToggle();

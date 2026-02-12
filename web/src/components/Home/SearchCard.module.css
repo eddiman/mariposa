@@ -1,0 +1,143 @@
+/* ==============================================
+   SEARCH CARD STYLES
+   Uses semantic --color-home-* tokens from index.css
+   ============================================== */
+
+/* Wrapper anchors from top so card expands downward */
+.wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 31.25rem;
+}
+
+.card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius-xl);
+  box-shadow: 
+    0 4px 24px color-mix(in srgb, var(--color-home-card-shadow-1) 15%, transparent),
+    0 8px 48px color-mix(in srgb, var(--color-home-card-shadow-2) 10%, transparent);
+  overflow: hidden;
+  transition: box-shadow var(--transition-smooth);
+}
+
+.card:focus-within {
+  box-shadow: 
+    0 4px 24px color-mix(in srgb, var(--color-home-card-shadow-1) 20%, transparent),
+    0 12px 64px color-mix(in srgb, var(--color-home-card-shadow-2) 15%, transparent);
+}
+
+/* Input area - stays fixed at top */
+.inputWrapper {
+  padding: var(--spacing-4) var(--spacing-5);
+}
+
+.input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.input::placeholder {
+  color: var(--color-placeholder);
+}
+
+/* Results area - animates height explicitly */
+.results {
+  height: 0;
+  overflow: hidden;
+  transition: height var(--transition-smooth);
+}
+
+.results.resultsOpen {
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* Inner container - scrollable when content exceeds max */
+.resultsInner {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar */
+.resultsInner::-webkit-scrollbar {
+  width: var(--spacing-1-5);
+}
+
+.resultsInner::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.resultsInner::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-xs);
+}
+
+.resultsInner::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Category group */
+.categoryGroup {
+  padding: var(--spacing-3) var(--spacing-5) var(--spacing-2);
+}
+
+.categoryGroup:first-child {
+  padding-top: var(--spacing-4);
+}
+
+.categoryHeader {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xxs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-2);
+}
+
+/* Note item */
+.noteItem {
+  padding: var(--spacing-2) var(--spacing-5);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.noteItem:hover,
+.noteItem.highlighted {
+  background-color: var(--color-home-highlight);
+}
+
+.noteTitle {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Empty/loading states */
+.emptyState {
+  padding: var(--spacing-6) var(--spacing-5);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+}
+
+.loadingState {
+  padding: var(--spacing-6) var(--spacing-5);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+}
+
+/* Last item spacing */
+.categoryGroup:last-child {
+  padding-bottom: var(--spacing-4);
+}

@@ -9,6 +9,7 @@ import { GhostNote } from './components/GhostNote';
 import { GhostSection } from './components/GhostSection';
 import { GhostSticky } from './components/GhostSticky';
 import { PlacementHint } from './components/PlacementHint';
+import { Home } from './components/Home';
 
 // Lazy load dialogs and editor (not needed on initial render)
 const NoteEditor = lazy(() => import('./components/NoteEditor/NoteEditor'));
@@ -22,7 +23,7 @@ import { useCanvas } from './hooks/useCanvas';
 import { useSettings } from './hooks/useSettings';
 import { useSidebarNotes } from './hooks/useSidebarNotes';
 import { isTouchDevice } from './utils/platform.js';
-import { 
+import {  
   EditorProvider, 
   useEditor, 
   PlacementProvider, 
@@ -30,8 +31,9 @@ import {
   CategoryDialogProvider, 
   useCategoryDialog 
 } from './contexts';
-import type { Position, CanvasTool, NoteMeta, StickyColor } from './types';
+import type { Position, CanvasTool, NoteMeta, StickyColor, Note } from './types';
 import type { Node } from '@xyflow/react';
+import { findNotesInsideSectionBounds, getNotesForSectionUpdate } from './utils/sectionPositioning.js';
 
 function AppContent() {
   const { 
@@ -77,6 +79,7 @@ function AppContent() {
     const saved = localStorage.getItem('mariposa-sidebar-open');
     return saved === 'true';
   });
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   
   // Persist sidebar state to localStorage
   const handleSidebarToggle = useCallback(() => {
@@ -143,6 +146,8 @@ function AppContent() {
     setIsCreating,
     prepareEditorOpen,
     createNote,
+    refetchCategories,
+    setRefetchTrigger,
   });
 
   // Selection state for alignment toolbar
@@ -150,7 +155,7 @@ function AppContent() {
   const updateNodePositionsRef = useRef<((updates: NodePositionUpdate[]) => void) | null>(null);
   
   // History state for undo/redo (will be used by context menu later)
-  const [_historyHandle, setHistoryHandle] = useState<CanvasHistoryHandle | null>(null);
+  const [, setHistoryHandle] = useState<CanvasHistoryHandle | null>(null);
   
   // Ref to update sidebar note cache when notes are edited
   const sidebarNoteUpdateRef = useRef<((slug: string, updates: Partial<NoteMeta>) => void) | null>(null);
@@ -219,11 +224,15 @@ function AppContent() {
 
   const handleNoteDelete = useCallback(async (slug: string) => {
     await deleteNote(slug);
-  }, [deleteNote]);
+    await refetchCategories();
+    setRefetchTrigger(prev => prev + 1);
+  }, [deleteNote, refetchCategories]);
 
   const handleNotesDelete = useCallback(async (slugs: string[]) => {
     await Promise.all(slugs.map(slug => deleteNote(slug)));
-  }, [deleteNote]);
+    await refetchCategories();
+    setRefetchTrigger(prev => prev + 1);
+  }, [deleteNote, refetchCategories]);
 
   const handleImagesDelete = useCallback(async (ids: string[]) => {
     await Promise.all(ids.map(id => deleteImage(id)));
@@ -231,25 +240,95 @@ function AppContent() {
 
   const handleNoteDuplicate = useCallback(async (slug: string, position: Position) => {
     await duplicateNote(slug, position);
-  }, [duplicateNote]);
+    await refetchCategories();
+    setRefetchTrigger(prev => prev + 1);
+  }, [duplicateNote, refetchCategories]);
 
   const handleImageDuplicate = useCallback(async (id: string, position: Position) => {
     await duplicateImage(id, position);
   }, [duplicateImage]);
 
   // Section handlers
-  const handleSectionCreate = useCallback(async (position: Position) => {
+  const handleSectionCreate = useCallback(async (position: Position, nodes?: Node[]) => {
     const category = currentSpace || 'all-notes';
-    await createSection({ position, category });
+    
+    // Debug: Log nodes to verify they're being passed correctly
+    console.log('Section creation - nodes received:', nodes?.length, 'nodes');
+    
+    // Find notes that would be inside this section
+    const overlappingNoteSlugs = nodes && nodes.length > 0 
+      ? findNotesInsideSectionBounds(
+          position,
+          500, // default section width (from SectionCreateSchema)
+          400, // default section height (from SectionCreateSchema)
+          nodes
+        )
+      : [];
+    
+    console.log('Section creation - overlapping notes found:', overlappingNoteSlugs);
+    
+    // Create section with overlapping notes
+    const createdSection = await createSection({
+      position,
+      category,
+      noteSlugs: overlappingNoteSlugs.length > 0 ? overlappingNoteSlugs : undefined
+    });
+    
+    console.log('Section created:', createdSection?.slug, 'with notes:', overlappingNoteSlugs);
   }, [createSection, currentSpace]);
 
   const handleSectionPositionChange = useCallback((slug: string, position: Position) => {
     updateSectionPosition(slug, position);
   }, [updateSectionPosition]);
 
-  const handleSectionResize = useCallback((slug: string, width: number, height: number) => {
+  const handleSectionResize = useCallback(async (slug: string, width: number, height: number) => {
+    // First update the section size
     updateSectionSize(slug, width, height);
-  }, [updateSectionSize]);
+    
+    // Find the section to get its current position
+    const section = sections.find(s => s.slug === slug);
+    if (!section || !section.position) return;
+    
+    // Create an updated section object with new dimensions
+    const updatedSection = { ...section, width, height };
+    
+    // Convert notes to a format compatible with getNotesForSectionUpdate
+    const nodesForUpdate = notes.map(note => ({
+      id: note.slug,
+      position: note.position,
+      type: 'note',
+      measured: { width: 200, height: 283 }, // Default note dimensions
+      data: { section: note.section }
+    }));
+    
+    // Use comprehensive function to check note associations
+    const { notesToAdd, notesToRemove } = getNotesForSectionUpdate(
+      updatedSection,
+      nodesForUpdate
+    );
+    
+    // Update notes that should be added to this section
+    if (notesToAdd.length > 0) {
+      for (const noteSlug of notesToAdd) {
+        try {
+          await updateNote(noteSlug, { section: slug });
+        } catch (error) {
+          console.error(`Failed to add note ${noteSlug} to section ${slug}:`, error);
+        }
+      }
+    }
+    
+    // Update notes that should be removed from this section
+    if (notesToRemove.length > 0) {
+      for (const noteSlug of notesToRemove) {
+        try {
+          await updateNote(noteSlug, { section: null });
+        } catch (error) {
+          console.error(`Failed to remove note ${noteSlug} from section ${slug}:`, error);
+        }
+      }
+    }
+  }, [updateSectionSize, sections, notes, updateNote]);
 
   const handleSectionRename = useCallback((slug: string, name: string) => {
     updateSection(slug, { name });
@@ -286,7 +365,7 @@ function AppContent() {
   }, [deleteSticky]);
 
   // Handle canvas click during placement mode - create item at position based on type
-  const handlePlacementClick = useCallback(async (position: Position) => {
+  const handlePlacementClick = useCallback(async (position: Position, nodes?: Node[]) => {
     if (isCreating || !placementType) return;
     
     const category = currentSpace || 'all-notes';
@@ -313,15 +392,34 @@ function AppContent() {
           height: 283,
         }, newNote);
         setFocusedNoteSlug(newNote.slug, category);
+        
+        // Refresh category metadata and invalidate sidebar cache
+        await refetchCategories();
+        setRefetchTrigger(prev => prev + 1);
       }
     } else if (placementType === 'section') {
       exitPlacementMode();
-      await createSection({ position, category });
+      
+      // Find notes that would be inside this section
+      const overlappingNoteSlugs = nodes && nodes.length > 0 
+        ? findNotesInsideSectionBounds(
+            position,
+            500, // default section width
+            400, // default section height
+            nodes
+          )
+        : [];
+      
+      await createSection({
+        position,
+        category,
+        noteSlugs: overlappingNoteSlugs.length > 0 ? overlappingNoteSlugs : undefined
+      });
     } else if (placementType === 'sticky') {
       exitPlacementMode();
       await createSticky({ position, category });
     }
-  }, [createNote, createSection, createSticky, currentSpace, isCreating, placementType, setIsCreating, exitPlacementMode, prepareEditorOpen, setFocusedNoteSlug]);
+  }, [createNote, createSection, createSticky, currentSpace, isCreating, placementType, setIsCreating, exitPlacementMode, prepareEditorOpen, setFocusedNoteSlug, refetchCategories, sections]);
 
   // Category handlers
   const handleCreateCategory = useCallback(async (slug: string, displayName: string) => {
@@ -343,6 +441,7 @@ function AppContent() {
     const result = await moveNoteToCategory(slug, category);
     if (result) {
       await refetchCategories();
+      setRefetchTrigger(prev => prev + 1);
     }
     return result;
   }, [moveNoteToCategory, refetchCategories]);
@@ -401,6 +500,29 @@ function AppContent() {
     }
   }, [focusOnNodeRef]);
 
+  // Handler for home page note selection from search
+  const handleHomeNoteSelect = useCallback((note: Note) => {
+    // Navigate to the note's category
+    const targetCategory = note.category === 'uncategorized' ? null : note.category;
+    setCurrentSpace(targetCategory);
+    
+    // Focus on the note's node on canvas, then open after animation
+    if (focusOnNodeRef.current) {
+      focusOnNodeRef.current(note.slug, { zoom: 1, duration: 300 });
+    }
+    
+    // Open the note editor after focus animation completes
+    setTimeout(() => {
+      prepareEditorOpen({
+        x: window.innerWidth / 2 - 100,
+        y: window.innerHeight / 2 - 141,
+        width: 200,
+        height: 283,
+      }, note);
+      setFocusedNoteSlug(note.slug, note.category);
+    }, 400); // 300ms focus + 100ms buffer
+  }, [setCurrentSpace, prepareEditorOpen, setFocusedNoteSlug, focusOnNodeRef]);
+
   return (
     <div className="app">
       {/* Morphing sidebar with integrated toggle */}
@@ -421,64 +543,74 @@ function AppContent() {
         loading={loadingCategories}
         sections={sections}
         onSectionClick={handleSidebarSectionClick}
+        refetchTrigger={refetchTrigger}
       />
       
       <main className={`app-main full ${isPlacementMode ? 'placement-mode' : ''}`}>
-        <Canvas
-          notes={notes}
-          images={images}
-          sections={sections}
-          stickies={stickies}
-          categories={categories}
-          activeTool={activeTool}
-          isPlacementMode={isPlacementMode}
-          onPlacementClick={handlePlacementClick}
-          onNoteOpen={handleNoteOpen}
-          onNotePositionChange={handleNotePositionChange}
-          onImagePositionChange={handleImagePositionChange}
-          onImageResize={handleImageResize}
-          onImagePaste={handleImagePaste}
-          onNotesDelete={handleNotesDelete}
-          onImagesDelete={handleImagesDelete}
-          onNoteDuplicate={handleNoteDuplicate}
-          onImageDuplicate={handleImageDuplicate}
-          onNoteMoveToCategory={handleNoteMoveToCategory}
-          onImageMoveToCategory={handleImageMoveToCategory}
-          onNoteSectionChange={handleNoteSectionChange}
-          onSectionCreate={handleSectionCreate}
-          onSectionPositionChange={handleSectionPositionChange}
-          onSectionResize={handleSectionResize}
-          onSectionRename={handleSectionRename}
-          onSectionColorChange={handleSectionColorChange}
-          onSectionsDelete={handleSectionsDelete}
-          onStickyCreate={handleStickyCreate}
-          onStickyPositionChange={handleStickyPositionChange}
-          onStickyTextChange={handleStickyTextChange}
-          onStickyColorChange={handleStickyColorChange}
-          onStickiesDelete={handleStickiesDelete}
-          onSelectionChange={handleSelectionChange}
-          onUpdateNodePositionsRef={handleUpdateNodePositionsRef}
-          onFocusOnNodeRef={handleFocusOnNodeRef}
-          onEnterPlacementMode={enterPlacementMode}
-          onHistoryChange={handleHistoryChange}
-          loading={loading}
-          settings={settings}
-        />
+        {currentSpace === null ? (
+          <Home onNoteSelect={handleHomeNoteSelect} />
+        ) : (
+          <Canvas
+            notes={notes}
+            images={images}
+            sections={sections}
+            stickies={stickies}
+            categories={categories}
+            activeTool={activeTool}
+            isPlacementMode={isPlacementMode}
+            onPlacementClick={handlePlacementClick}
+            onNoteOpen={handleNoteOpen}
+            onNotePositionChange={handleNotePositionChange}
+            onImagePositionChange={handleImagePositionChange}
+            onImageResize={handleImageResize}
+            onImagePaste={handleImagePaste}
+            onNotesDelete={handleNotesDelete}
+            onImagesDelete={handleImagesDelete}
+            onNoteDuplicate={handleNoteDuplicate}
+            onImageDuplicate={handleImageDuplicate}
+            onNoteMoveToCategory={handleNoteMoveToCategory}
+            onImageMoveToCategory={handleImageMoveToCategory}
+            onNoteSectionChange={handleNoteSectionChange}
+            onSectionCreate={handleSectionCreate}
+            onSectionPositionChange={handleSectionPositionChange}
+            onSectionResize={handleSectionResize}
+            onSectionRename={handleSectionRename}
+            onSectionColorChange={handleSectionColorChange}
+            onSectionsDelete={handleSectionsDelete}
+            onStickyCreate={handleStickyCreate}
+            onStickyPositionChange={handleStickyPositionChange}
+            onStickyTextChange={handleStickyTextChange}
+            onStickyColorChange={handleStickyColorChange}
+            onStickiesDelete={handleStickiesDelete}
+            onSelectionChange={handleSelectionChange}
+            onUpdateNodePositionsRef={handleUpdateNodePositionsRef}
+            onFocusOnNodeRef={handleFocusOnNodeRef}
+            onEnterPlacementMode={enterPlacementMode}
+            onHistoryChange={handleHistoryChange}
+            loading={loading}
+            settings={settings}
+          />
+        )}
       </main>
       
-      <Toolbar 
-        isPlacementMode={isPlacementMode}
-        placementType={placementType}
-        onEnterPlacementMode={enterPlacementMode}
-        onExitPlacementMode={exitPlacementMode}
-      />
+      {/* Only show toolbar and placement UI when not on home page */}
+      {currentSpace !== null && (
+        <>
+          <Toolbar 
+            isPlacementMode={isPlacementMode}
+            placementType={placementType}
+            onEnterPlacementMode={enterPlacementMode}
+            onExitPlacementMode={exitPlacementMode}
+          />
+          
+          <GhostNote visible={isPlacementMode && placementType === 'note'} />
+          <GhostSection visible={isPlacementMode && placementType === 'section'} />
+          <GhostSticky visible={isPlacementMode && placementType === 'sticky'} />
+          <PlacementHint visible={isPlacementMode} />
+        </>
+      )}
       
-      <GhostNote visible={isPlacementMode && placementType === 'note'} />
-      <GhostSection visible={isPlacementMode && placementType === 'section'} />
-      <GhostSticky visible={isPlacementMode && placementType === 'sticky'} />
-      <PlacementHint visible={isPlacementMode} />
-      
-      {showToolSwitcher && (
+      {showToolSwitcher && currentSpace !== null && (
         <ToolSwitcher 
           activeTool={activeTool} 
           onToolChange={setActiveTool}
@@ -486,10 +618,12 @@ function AppContent() {
         />
       )}
       
-      <SelectionToolbar
-        selectedNodes={selectedNodes}
-        onUpdateNodePositions={handleUpdateNodePositions}
-      />
+      {currentSpace !== null && (
+        <SelectionToolbar
+          selectedNodes={selectedNodes}
+          onUpdateNodePositions={handleUpdateNodePositions}
+        />
+      )}
       
       {/* Lazy-loaded dialogs */}
       <Suspense fallback={null}>

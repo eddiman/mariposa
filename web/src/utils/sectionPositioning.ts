@@ -172,3 +172,86 @@ export function getSectionContainingNode(
   }
   return undefined;
 }
+
+/**
+ * Comprehensive function to manage note-section associations
+ * Returns notes that should be added to or removed from a section
+ */
+export function getNotesForSectionUpdate(
+  section: Section,
+  nodes: Node[]
+): {
+  notesToAdd: string[];
+  notesToRemove: string[];
+} {
+  const notesToAdd: string[] = [];
+  const notesToRemove: string[] = [];
+
+  for (const node of nodes) {
+    if (node.type !== 'note') continue;
+
+    const noteData = node.data as { section?: string };
+    const isCurrentlyInSection = noteData.section === section.slug;
+    const isInOtherSection = noteData.section && noteData.section !== section.slug;
+
+    // Skip notes that are in other sections (unless we're implementing section switching)
+    if (isInOtherSection) continue;
+
+    // Check if note is inside this section
+    const isInsideSection = isNodeInsideSection(node, section, section.position);
+
+    if (isInsideSection && !isCurrentlyInSection) {
+      // Note is inside section but not currently associated - should be added
+      notesToAdd.push(node.id);
+    } else if (!isInsideSection && isCurrentlyInSection) {
+      // Note is not inside section but is currently associated - should be removed
+      notesToRemove.push(node.id);
+    }
+  }
+
+  return { notesToAdd, notesToRemove };
+}
+
+/**
+ * Find notes that would be inside a section at a given position
+ */
+export function findNotesInsideSectionBounds(
+  sectionPosition: Position,
+  sectionWidth: number,
+  sectionHeight: number,
+  notes: Node[]
+): string[] {
+  const noteSlugs: string[] = [];
+
+  for (const note of notes) {
+    if (note.type !== 'note') continue;
+
+    // Check if note is already in another section
+    const noteData = note.data as { section?: string };
+    if (noteData.section) continue; // Skip notes already in sections
+
+    // Get note dimensions
+    const noteWidth = note.measured?.width ?? NOTE_WIDTH;
+    const noteHeight = note.measured?.height ?? NOTE_HEIGHT;
+
+    // Check if note center is inside the new section bounds
+    const noteCenterX = note.position.x + noteWidth / 2;
+    const noteCenterY = note.position.y + noteHeight / 2;
+
+    const sectionX = sectionPosition.x;
+    const sectionY = sectionPosition.y;
+
+    const isInside = (
+      noteCenterX >= sectionX &&
+      noteCenterX <= sectionX + sectionWidth &&
+      noteCenterY >= sectionY &&
+      noteCenterY <= sectionY + sectionHeight
+    );
+
+    if (isInside) {
+      noteSlugs.push(note.id);
+    }
+  }
+
+  return noteSlugs;
+}

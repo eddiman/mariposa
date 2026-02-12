@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { getNextSlugForType } from '../utils/slugGenerator.js';
 import type { Section, SectionCreateInput, SectionUpdateInput, SectionQuery } from '../types/section.js';
 import type { Position } from '../types/note.js';
+import { noteService } from './noteService.js';
 
 interface SectionFrontmatter {
   slug: string;
@@ -141,6 +142,11 @@ class SectionService {
     const fileContent = serializeSection(section);
     await fs.writeFile(filePath, fileContent, 'utf-8');
 
+    // If note slugs are provided, update those notes to include this section
+    if (input.noteSlugs && input.noteSlugs.length > 0) {
+      await this.updateNotesWithSection(input.noteSlugs, slug);
+    }
+
     return section;
   }
 
@@ -182,6 +188,17 @@ class SectionService {
     }
 
     return updatedSection;
+  }
+
+  private async updateNotesWithSection(noteSlugs: string[], sectionSlug: string): Promise<void> {
+    for (const noteSlug of noteSlugs) {
+      try {
+        await noteService.update(noteSlug, { section: sectionSlug });
+      } catch (error) {
+        console.error(`Failed to update note ${noteSlug} with section ${sectionSlug}:`, error);
+        // Continue with other notes even if one fails
+      }
+    }
   }
 
   async delete(slug: string): Promise<boolean> {

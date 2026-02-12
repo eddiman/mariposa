@@ -3,7 +3,7 @@ import type { Node } from '@xyflow/react';
 import type { Position, Section } from '../types';
 import type { NodeSnapshot, HistoryAction } from './useCanvasHistory';
 import type { GuideLine } from '../components/SnapGuides';
-import { getSectionContainingNode } from '../utils/sectionPositioning.js';
+import { getSectionContainingNode, isNodeInsideSection } from '../utils/sectionPositioning.js';
 
 interface UseCanvasNodeDragProps<T extends Record<string, unknown>> {
   isTouch: boolean;
@@ -23,32 +23,7 @@ interface UseCanvasNodeDragProps<T extends Record<string, unknown>> {
   onNoteSectionChange?: (noteSlug: string, sectionSlug: string | null) => void;
 }
 
-// Helper to check if a node is inside a section's bounds
-function isNodeInsideSection<T extends Record<string, unknown>>(
-  node: Node<T>,
-  section: Node<T>
-): boolean {
-  // Don't include sections or the section itself
-  if (node.type === 'section' || node.id === section.id) return false;
 
-  const sectionData = section.data as { width?: number; height?: number };
-  const sectionWidth = sectionData.width || 300;
-  const sectionHeight = sectionData.height || 200;
-
-  const nodeWidth = node.measured?.width ?? (node.type === 'note' ? 200 : node.type === 'sticky' ? 150 : 300);
-  const nodeHeight = node.measured?.height ?? (node.type === 'note' ? 283 : node.type === 'sticky' ? 150 : 200);
-
-  // Check if node center is inside section bounds
-  const nodeCenterX = node.position.x + nodeWidth / 2;
-  const nodeCenterY = node.position.y + nodeHeight / 2;
-
-  return (
-    nodeCenterX >= section.position.x &&
-    nodeCenterX <= section.position.x + sectionWidth &&
-    nodeCenterY >= section.position.y &&
-    nodeCenterY <= section.position.y + sectionHeight
-  );
-}
 
 export function useCanvasNodeDrag<T extends Record<string, unknown>>({
   isTouch,
@@ -269,6 +244,29 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
       }
     }
     dragStartSectionsRef.current.clear();
+
+    // Check if section was dragged over new notes that should be included
+    if (draggedSectionRef.current && onNoteSectionChange) {
+      const draggedSectionNode = nodeMap.get(draggedSectionRef.current);
+      if (draggedSectionNode && draggedSectionNode.type === 'section') {
+        const sectionData = draggedSectionNode.data as { slug: string };
+        const sectionSlug = sectionData.slug;
+        
+        // Find all notes and check if they're now inside this section
+        for (const [nodeId, node] of nodeMap) {
+          if (node.type === 'note') {
+            // Skip if note is already in a section
+            const noteData = node.data as { section?: string };
+            if (noteData.section) continue;
+            
+            // Check if note is now inside the dragged section
+            if (isNodeInsideSection(node, draggedSectionNode)) {
+              onNoteSectionChange(nodeId, sectionSlug);
+            }
+          }
+        }
+      }
+    }
 
     // Clear section drag tracking
     containedNodesRef.current.clear();

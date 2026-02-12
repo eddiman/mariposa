@@ -151,7 +151,7 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
       ImagePasteExtension,
     ],
     content,
-    autofocus: autoFocus ? 'end' : false,
+    autofocus: false,
     editorProps: {
       attributes: {
         class: styles['editor-content'],
@@ -174,8 +174,21 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
     if (editor && content !== lastContentRef.current) {
       lastContentRef.current = content;
       editor.commands.setContent(content);
+      // Scroll to top when loading new content
+      setTimeout(() => {
+        editor.commands.focus('start');
+      }, 50);
     }
   }, [editor, content]);
+
+  // Handle autoFocus by focusing at start when editor is ready
+  useEffect(() => {
+    if (autoFocus && editor) {
+      setTimeout(() => {
+        editor.commands.focus('start');
+      }, 50);
+    }
+  }, [autoFocus, editor]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Allow Escape and Cmd/Ctrl+S to propagate for parent handling

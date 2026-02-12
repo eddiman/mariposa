@@ -4,11 +4,12 @@ import { PositionSchema } from './note.js';
 // Zod schemas for validation
 export const SectionCreateSchema = z.object({
   name: z.string().default('Section'),
-  width: z.number().default(300),
-  height: z.number().default(200),
+  width: z.number().default(500),
+  height: z.number().default(400),
   color: z.string().optional(),
   position: PositionSchema.optional(),
   category: z.string().default('all-notes'),
+  noteSlugs: z.array(z.string()).optional(), // Notes to include in this section
 });
 
 export const SectionUpdateSchema = z.object({

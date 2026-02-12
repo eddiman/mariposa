@@ -12,9 +12,12 @@ export function SidebarCategoryItem({
   category,
   isActive,
   onTitleClick,
-  onChevronClick,
+  onChevronClick: _onChevronClick,
 }: SidebarCategoryItemProps) {
-  const isEmpty = category.noteCount === 0;
+  // Reserved for future use with chevron button
+  void _onChevronClick;
+  const _isEmpty = category.noteCount === 0;
+  void _isEmpty;
 
   return (
     <div className={styles['sidebar-category-wrapper']}>
@@ -39,7 +42,7 @@ export function SidebarCategoryItem({
           <span className={styles['sidebar-category-count']}>{category.noteCount}</span>
         </button>
 
-        <button
+        {/* <button
           className={`${styles['sidebar-category-chevron']} ${isEmpty ? styles.muted : ''}`}
           onClick={onChevronClick}
           aria-label="View notes"
@@ -54,7 +57,7 @@ export function SidebarCategoryItem({
           >
             <polyline points="9,18 15,12 9,6" />
           </svg>
-        </button>
+        </button> */}
       </div>
     </div>
   );

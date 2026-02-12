@@ -3,8 +3,8 @@
   position: fixed;
   z-index: var(--z-context-menu);
   pointer-events: none;
-  width: 150px;
-  height: 100px;
+  width: 200px;
+  height: 150px;
   background: rgba(var(--color-primary-rgb), 0.1);
   border: 2px dashed var(--color-primary);
   border-radius: var(--radius);

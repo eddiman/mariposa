@@ -14,6 +14,34 @@
 :root {
   /* ===== NON-THEMEABLE TOKENS ===== */
   
+  /* ===== BRAND COLOR SCALES ===== */
+  
+  /* Blue scale - base: #3B67F6 */
+  --color-blue-50: #EEF2FE;
+  --color-blue-100: #DFE6FD;
+  --color-blue-200: #C5D2FB;
+  --color-blue-300: #9FB4F9;
+  --color-blue-400: #6B8DF7;
+  --color-blue-500: #3B67F6;    /* Base */
+  --color-blue-600: #2952E0;
+  --color-blue-700: #2142B8;
+  --color-blue-800: #1A3491;
+  --color-blue-900: #152A73;
+  --color-blue-950: #0D1A4A;
+  
+  /* Pink scale - base: #F7A9F1 */
+  --color-pink-50: #FEF5FD;
+  --color-pink-100: #FDEBFB;
+  --color-pink-200: #FBD7F8;
+  --color-pink-300: #F9C3F4;
+  --color-pink-400: #F7A9F1;    /* Base */
+  --color-pink-500: #F07BE6;
+  --color-pink-600: #E34DD6;
+  --color-pink-700: #C733B8;
+  --color-pink-800: #A32B97;
+  --color-pink-900: #7E2375;
+  --color-pink-950: #55174F;
+  
   /* Font sizes */
   --font-size-xxs: 0.6875rem;    /* 11px */
   --font-size-xs: 0.75rem;        /* 12px */
@@ -163,6 +191,30 @@
   --color-white-20: rgba(255, 255, 255, 0.2);
   --color-white-15: rgba(255, 255, 255, 0.15);
   
+  /* ===== HOME PAGE COLORS ===== */
+  /* Semantic tokens using the brand color scales */
+  
+  /* Gradient colors - light neutrals with subtle blue tint */
+  --color-home-gradient-start: #f5f5f5;
+  --color-home-gradient-mid-1: var(--color-blue-50);
+  --color-home-gradient-mid-2: var(--color-blue-100);
+  --color-home-gradient-end: var(--color-blue-50);
+  
+  /* Blob colors - brand blue at various opacities */
+  --color-home-blob-1: color-mix(in srgb, var(--color-blue-300) 15%, transparent);
+  --color-home-blob-2: color-mix(in srgb, var(--color-blue-200) 20%, transparent);
+  --color-home-blob-3: color-mix(in srgb, var(--color-blue-400) 10%, transparent);
+  --color-home-blob-4: color-mix(in srgb, var(--color-blue-100) 25%, transparent);
+  --color-home-blob-5: color-mix(in srgb, var(--color-blue-300) 12%, transparent);
+  
+  /* UI element colors */
+  --color-home-dots: color-mix(in srgb, var(--color-blue-200) 30%, transparent);
+  --color-home-title: var(--color-blue-800);
+  --color-home-title-shadow: color-mix(in srgb, var(--color-blue-500) 15%, transparent);
+  --color-home-card-shadow-1: color-mix(in srgb, var(--color-blue-500) 15%, transparent);
+  --color-home-card-shadow-2: color-mix(in srgb, var(--color-blue-300) 10%, transparent);
+  --color-home-highlight: var(--color-blue-50);
+  
   /* ===== TYPOGRAPHY ===== */
   
   /* Font families */
@@ -237,6 +289,30 @@
   --color-white: #ffffff;
   --color-white-20: rgba(255, 255, 255, 0.2);
   --color-white-15: rgba(255, 255, 255, 0.15);
+  
+  /* ===== HOME PAGE COLORS ===== */
+  /* Bauhaus-style home - uses primary bauhaus colors: red, blue, yellow */
+  
+  /* Gradient colors - warm cream to soft yellow */
+  --color-home-gradient-start: #faf8f0;
+  --color-home-gradient-mid-1: #fcf9e8;
+  --color-home-gradient-mid-2: #fdf6dc;
+  --color-home-gradient-end: #fef3d0;
+  
+  /* Blob colors - bauhaus primaries at low opacity */
+  --color-home-blob-1: rgba(26, 71, 168, 0.15);   /* Blue */
+  --color-home-blob-2: rgba(222, 28, 36, 0.12);   /* Red */
+  --color-home-blob-3: rgba(245, 198, 35, 0.2);   /* Yellow */
+  --color-home-blob-4: rgba(26, 71, 168, 0.1);    /* Blue light */
+  --color-home-blob-5: rgba(222, 28, 36, 0.08);   /* Red light */
+  
+  /* UI element colors */
+  --color-home-dots: rgba(26, 71, 168, 0.08);
+  --color-home-title: var(--color-bauhaus-blue);
+  --color-home-title-shadow: rgba(26, 71, 168, 0.15);
+  --color-home-card-shadow-1: rgba(26, 26, 26, 0.1);
+  --color-home-card-shadow-2: rgba(26, 26, 26, 0.05);
+  --color-home-highlight: rgba(245, 198, 35, 0.2);
   
   /* ===== TYPOGRAPHY ===== */
   

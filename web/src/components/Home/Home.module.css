@@ -1,0 +1,61 @@
+/* ==============================================
+   HOME PAGE STYLES
+   Uses semantic --color-home-* tokens from index.css
+   ============================================== */
+
+.home {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--spacing-6);
+  padding-top: 25vh;
+  overflow-y: auto;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-8);
+  width: 100%;
+  max-width: 37.5rem;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-5xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-home-title);
+  margin: 0;
+  text-align: center;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 16px var(--color-home-title-shadow);
+}
+
+.titleBracket {
+  font-weight: var(--font-weight-normal);
+  opacity: 0.8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 37.5rem) {
+  .content {
+    gap: var(--spacing-6);
+  }
+
+  .title {
+    font-size: var(--font-size-4xl);
+  }
+}
+
+@media (max-width: 25rem) {
+  .title {
+    font-size: var(--font-size-3xl);
+  }
+}

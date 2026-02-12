@@ -10,8 +10,8 @@ interface ContextMenuState {
   nodeId?: string;
 }
 
-interface UseCanvasContextMenuProps {
-  nodes: Node[];
+interface UseCanvasContextMenuProps<T extends Record<string, unknown>> {
+  nodes: Node<T>[];
   categories: CategoryMeta[];
   screenToFlowPosition: (position: { x: number; y: number }) => Position;
   canUndo: boolean;
@@ -21,8 +21,8 @@ interface UseCanvasContextMenuProps {
   handleCopyNodes: () => void;
   handlePasteNodes: () => void;
   handleAddImage: () => void;
-  onPlacementClick?: (position: Position) => void;
-  onAddSection?: (position: Position) => void;
+  onPlacementClick?: (position: Position, nodes?: Node<T>[]) => void;
+  onAddSection?: (position: Position, nodes?: Node<T>[]) => void;
   onAddSticky?: (position: Position) => void;
   onStickyColorChange?: (slug: string, color: StickyColor) => void;
   onSectionColorChange?: (slug: string, color: StickyColor) => void;
@@ -31,7 +31,7 @@ interface UseCanvasContextMenuProps {
   onDeleteRequest: (noteSlugs: string[], imageIds: string[], sectionSlugs?: string[], stickySlugs?: string[]) => void;
 }
 
-export function useCanvasContextMenu({
+export function useCanvasContextMenu<T extends Record<string, unknown>>({
   nodes,
   categories,
   screenToFlowPosition,
@@ -50,7 +50,7 @@ export function useCanvasContextMenu({
   onNoteMoveToCategory,
   onImageMoveToCategory,
   onDeleteRequest,
-}: UseCanvasContextMenuProps) {
+}: UseCanvasContextMenuProps<T>) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const contextMenuPositionRef = useRef<Position>({ x: 0, y: 0 });
 
@@ -117,11 +117,11 @@ export function useCanvasContextMenu({
               <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 2" />
             </svg>
           ),
-          onClick: () => {
-            if (onAddSection) {
-              onAddSection(contextMenuPositionRef.current);
-            }
-          },
+           onClick: () => {
+             if (onAddSection) {
+               onAddSection(contextMenuPositionRef.current, nodes);
+             }
+           },
         },
         {
           label: 'Add Image',

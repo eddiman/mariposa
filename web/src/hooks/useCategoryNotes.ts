@@ -6,12 +6,19 @@ interface CategoryNotesState {
   loadingCategories: Set<string>;
 }
 
+interface UseCategoryNotesOptions {
+  refetchTrigger?: number;
+  currentSpace?: string | null;
+}
+
 /**
  * Fetches and caches notes for expanded categories.
  * Lazy loads notes when a category is expanded.
  * For 'all-notes', fetches all notes and groups by category.
  */
-export function useCategoryNotes(expandedCategories: Set<string>) {
+export function useCategoryNotes(expandedCategories: Set<string>, options: UseCategoryNotesOptions = {}) {
+  const { refetchTrigger, currentSpace } = options;
+  
   const [state, setState] = useState<CategoryNotesState>({
     notesByCategory: new Map(),
     loadingCategories: new Set(),
@@ -19,14 +26,17 @@ export function useCategoryNotes(expandedCategories: Set<string>) {
 
   // Track which categories we've already fetched
   const fetchedRef = useRef<Set<string>>(new Set());
+  // Track loading state separately for dependency management
+  const loadingRef = useRef<Set<string>>(new Set());
 
   const fetchNotesForCategory = useCallback(async (category: string) => {
     // Skip if already fetched or currently loading
-    if (fetchedRef.current.has(category) || state.loadingCategories.has(category)) {
+    if (fetchedRef.current.has(category) || loadingRef.current.has(category)) {
       return;
     }
 
     // Mark as loading
+    loadingRef.current.add(category);
     setState((prev) => ({
       ...prev,
       loadingCategories: new Set([...prev.loadingCategories, category]),
@@ -90,32 +100,49 @@ export function useCategoryNotes(expandedCategories: Set<string>) {
       console.error(`Error fetching notes for ${category}:`, error);
       
       // Remove from loading state on error
+      loadingRef.current.delete(category);
       setState((prev) => {
         const newLoading = new Set(prev.loadingCategories);
         newLoading.delete(category);
         return { ...prev, loadingCategories: newLoading };
       });
+    } finally {
+      // Always clean up loading state
+      loadingRef.current.delete(category);
     }
-  }, [state.loadingCategories]);
+  }, []);
 
-  // Fetch notes when categories are expanded
+  // Fetch notes when categories are expanded or when refetch is triggered
   useEffect(() => {
+    // Always refetch for current space if refetchTrigger changed
+    if (refetchTrigger !== undefined) {
+      const spaceToRefetch = currentSpace || 'all-notes';
+      // Clear the fetched guard to force a refetch
+      fetchedRef.current.delete(spaceToRefetch);
+      if (!loadingRef.current.has(spaceToRefetch)) {
+        fetchNotesForCategory(spaceToRefetch);
+      }
+    }
+    
+    // Also check expanded categories
     for (const category of expandedCategories) {
-      if (!fetchedRef.current.has(category) && !state.loadingCategories.has(category)) {
+      if (!fetchedRef.current.has(category) && !loadingRef.current.has(category)) {
         fetchNotesForCategory(category);
       }
     }
-  }, [expandedCategories, fetchNotesForCategory, state.loadingCategories]);
+  }, [expandedCategories, fetchNotesForCategory, refetchTrigger, currentSpace]);
 
   const refetch = useCallback((category?: string) => {
     if (category) {
       fetchedRef.current.delete(category);
+      loadingRef.current.delete(category);
       if (expandedCategories.has(category)) {
         fetchNotesForCategory(category);
       }
     } else {
       // Refetch all expanded categories
       fetchedRef.current.clear();
+      loadingRef.current.clear();
       for (const cat of expandedCategories) {
         fetchNotesForCategory(cat);
       }
@@ -132,11 +159,9 @@ export function useCategoryNotes(expandedCategories: Set<string>) {
       // Add at beginning (newest first)
       newNotesByCategory.set(category, [note, ...categoryNotes]);
       
-      // Also add to all-notes if it exists
-      const allNotes = newNotesByCategory.get('all-notes');
-      if (allNotes) {
-        newNotesByCategory.set('all-notes', [note, ...allNotes]);
-      }
+      // Always add to all-notes (create if doesn't exist)
+      const allNotes = newNotesByCategory.get('all-notes') || [];
+      newNotesByCategory.set('all-notes', [note, ...allNotes]);
       
       return { ...prev, notesByCategory: newNotesByCategory };
     });
