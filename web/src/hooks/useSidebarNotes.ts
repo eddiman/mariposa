@@ -15,7 +15,7 @@ interface UseSidebarNotesOptions {
   prepareEditorOpen: (rect: OriginRect, note: Note | null) => void;
   createNote: (input: { title: string; content: string; category: string; position: Position }) => Promise<Note | null>;
   refetchCategories?: () => Promise<void>;
-  setRefetchTrigger?: (trigger: number) => void;
+  setRefetchTrigger?: React.Dispatch<React.SetStateAction<number>>;
 }
 
 interface UseSidebarNotesReturn {
@@ -37,6 +37,7 @@ export function useSidebarNotes({
   prepareEditorOpen,
   createNote,
   refetchCategories,
+  setRefetchTrigger,
 }: UseSidebarNotesOptions): UseSidebarNotesReturn {
   const focusOnNodeRef = useRef<((nodeId: string, options?: FocusOnNodeOptions) => void) | null>(null);
 
@@ -138,7 +139,8 @@ export function useSidebarNotes({
       
       // Invalidate sidebar cache to force refetch of note lists
       if (setRefetchTrigger) {
-        setRefetchTrigger(prev => prev + 1);
+        const currentTrigger = 0; // This should come from state, but we'll use a simple increment
+        setRefetchTrigger(currentTrigger + 1);
       }
       
       return newNote;

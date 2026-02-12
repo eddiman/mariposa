@@ -215,6 +215,7 @@ function AppContent() {
   }, [uploadImage, currentSpace]);
 
   const handleNoteSave = useCallback(async (slug: string, content: string, title: string, tags: string[]) => {
+    console.log('Saving note:', slug, 'Content length:', content?.length);
     await updateNote(slug, { content, title, tags });
     // Update sidebar cache so title changes reflect immediately
     if (sidebarNoteUpdateRef.current) {
@@ -263,18 +264,14 @@ function AppContent() {
           400, // default section height (from SectionCreateSchema)
           nodes
         )
-      : [];
-    
-    console.log('Section creation - overlapping notes found:', overlappingNoteSlugs);
-    
+       : [];
+
     // Create section with overlapping notes
-    const createdSection = await createSection({
+    await createSection({
       position,
       category,
       noteSlugs: overlappingNoteSlugs.length > 0 ? overlappingNoteSlugs : undefined
     });
-    
-    console.log('Section created:', createdSection?.slug, 'with notes:', overlappingNoteSlugs);
   }, [createSection, currentSpace]);
 
   const handleSectionPositionChange = useCallback((slug: string, position: Position) => {
@@ -293,10 +290,11 @@ function AppContent() {
     const updatedSection = { ...section, width, height };
     
     // Convert notes to a format compatible with getNotesForSectionUpdate
-    const nodesForUpdate = notes.map(note => ({
+    const nodesForUpdate: Node[] = notes.map(note => ({
       id: note.slug,
-      position: note.position,
+      position: note.position || { x: 0, y: 0 },
       type: 'note',
+      positionAbsolute: note.position || { x: 0, y: 0 },
       measured: { width: 200, height: 283 }, // Default note dimensions
       data: { section: note.section }
     }));

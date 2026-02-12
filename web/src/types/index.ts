@@ -106,6 +106,7 @@ export interface SectionCreateInput {
   color?: string;
   position?: Position;
   category?: string;
+  noteSlugs?: string[]; // Notes to include in this section
 }
 
 export interface SectionUpdateInput {

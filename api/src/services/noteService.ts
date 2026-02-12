@@ -104,6 +104,8 @@ class NoteService {
   }
 
   async update(slug: string, input: NoteUpdateInput): Promise<Note | null> {
+    console.log('Backend update called for note:', slug, 'Input:', JSON.stringify(input, null, 2));
+    
     // Find the actual file path first - this is more reliable than parsing category from file
     const existingFilePath = await this.findNoteFile(slug);
     if (!existingFilePath) return null;
@@ -113,6 +115,7 @@ class NoteService {
 
     const existingContent = await fs.readFile(existingFilePath, 'utf-8');
     const existingNote = parseNote(existingContent);
+    console.log('Existing note content length:', existingNote.content?.length);
     
     // Use the actual category from file path, not the parsed one (which may be wrong due to race conditions)
     existingNote.category = actualCategory;
@@ -140,6 +143,8 @@ class NoteService {
       section: newSection,
       updatedAt: now,
     };
+    
+    console.log('Updated note content length:', updatedNote.content?.length);
 
     // If category changed, move the file
     if (newCategory !== actualCategory) {
@@ -155,7 +160,8 @@ class NoteService {
       const fileContent = serializeNote(updatedNote);
       await fs.writeFile(existingFilePath, fileContent, 'utf-8');
     }
-
+    
+    console.log('Note update completed successfully:', slug);
     return updatedNote;
   }
 

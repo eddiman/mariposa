@@ -95,6 +95,7 @@ export function useNotes(options: UseNotesOptions = {}): UseNotesReturn {
 
   const updateNote = useCallback(async (slug: string, input: NoteUpdateInput): Promise<Note | null> => {
     try {
+      console.log('Updating note via API:', slug, 'Input:', input);
       const res = await fetch(`/api/notes/${slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -102,6 +103,7 @@ export function useNotes(options: UseNotesOptions = {}): UseNotesReturn {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const note: Note = await res.json();
+      console.log('Note updated successfully:', slug, 'Content length:', note.content?.length);
       // Update local state with full note
       setNotes(prev => prev.map(n => 
         n.slug === slug ? note : n

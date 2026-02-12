@@ -158,8 +158,8 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
       },
     },
     onUpdate: ({ editor }) => {
-      // Skip updates before component is mounted
-      if (!isMountedRef.current) return;
+      // Skip updates before component is mounted or if editor is destroyed
+      if (!isMountedRef.current || !editor || editor.isDestroyed) return;
       
       // Get markdown content instead of HTML
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -175,18 +175,24 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
       lastContentRef.current = content;
       editor.commands.setContent(content);
       // Scroll to top when loading new content
-      setTimeout(() => {
-        editor.commands.focus('start');
+      const timer = setTimeout(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.focus('start');
+        }
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [editor, content]);
 
   // Handle autoFocus by focusing at start when editor is ready
   useEffect(() => {
     if (autoFocus && editor) {
-      setTimeout(() => {
-        editor.commands.focus('start');
+      const timer = setTimeout(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.focus('start');
+        }
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [autoFocus, editor]);
 

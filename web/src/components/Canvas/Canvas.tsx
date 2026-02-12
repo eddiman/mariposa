@@ -89,6 +89,7 @@ interface CanvasProps {
   onUpdateNodePositionsRef?: (handler: (updates: NodePositionUpdate[]) => void) => void;
   onFocusOnNodeRef?: (handler: (nodeId: string, options?: FocusOnNodeOptions) => void) => void;
   onEnterPlacementMode?: (type: PlacementType) => void;
+  onHistoryChange?: (history: CanvasHistoryHandle) => void;
   loading: boolean;
   settings: Settings;
 }

@@ -86,14 +86,21 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
     
     const loadNote = async () => {
       setLoading(true);
-      const fetchedNote = await getNote(slug);
-      if (fetchedNote) {
-        setNote(fetchedNote);
-        setTitle(fetchedNote.title);
-        setContent(fetchedNote.content);
-        setTags(fetchedNote.tags || []);
-        setCategory(fetchedNote.category || 'all-notes');
-        setSection(fetchedNote.section);
+      try {
+        const fetchedNote = await getNote(slug);
+        if (fetchedNote) {
+          console.log('Loaded note from API:', fetchedNote.slug, 'Content length:', fetchedNote.content?.length);
+          setNote(fetchedNote);
+          setTitle(fetchedNote.title);
+          setContent(fetchedNote.content);
+          setTags(fetchedNote.tags || []);
+          setCategory(fetchedNote.category || 'all-notes');
+          setSection(fetchedNote.section);
+        } else {
+          console.warn('Note not found:', slug);
+        }
+      } catch (error) {
+        console.error('Failed to load note:', error);
       }
       setLoading(false);
     };

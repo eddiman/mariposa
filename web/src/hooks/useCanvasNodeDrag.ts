@@ -193,41 +193,29 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
       dragStartPositionsRef.current.clear();
     }
 
-    // Persist the final positions for all affected nodes
-    const nodesToPersist = new Set([
-      ...draggedNodes.map(n => n.id),
-      ...containedNodesRef.current,
-    ]);
+      // Persist the final positions for all affected nodes
+      const nodesToPersist = new Set([
+        ...draggedNodes.map(n => n.id),
+        ...containedNodesRef.current,
+      ]);
 
-    for (const nodeId of nodesToPersist) {
-      const position = nodePositionMap.get(nodeId);
-      if (!position) continue;
+      for (const nodeId of nodesToPersist) {
+        const position = nodePositionMap.get(nodeId);
+        if (!position) continue;
 
-      if (nodeId.startsWith('image-')) {
-        const imageId = nodeId.replace('image-', '');
-        onImagePositionChange(imageId, position);
-      } else if (nodeId.startsWith('section-')) {
-        const sectionSlug = nodeId.replace('section-', '');
-        // Validate extracted slug - section node IDs should be 'section-section-N'
-        // so after removing 'section-' prefix, we should get 'section-N'
-        if (!/^section-\d+$/.test(sectionSlug)) {
-          console.warn(`Unexpected section slug format: "${sectionSlug}" from nodeId "${nodeId}". Skipping position update.`);
-          continue;
+        if (nodeId.startsWith('image-')) {
+          const imageId = nodeId.replace('image-', '');
+          onImagePositionChange(imageId, position);
+        } else if (nodeId.startsWith('section-')) {
+          const sectionSlug = nodeId.replace('section-', '');
+          onSectionPositionChange(sectionSlug, position);
+        } else if (nodeId.startsWith('sticky-')) {
+          const stickySlug = nodeId.replace('sticky-', '');
+          onStickyPositionChange(stickySlug, position);
+        } else {
+          onNotePositionChange(nodeId, position);
         }
-        onSectionPositionChange(sectionSlug, position);
-      } else if (nodeId.startsWith('sticky-')) {
-        const stickySlug = nodeId.replace('sticky-', '');
-        // Validate extracted slug - sticky node IDs should be 'sticky-sticky-N'
-        // so after removing 'sticky-' prefix, we should get 'sticky-N'
-        if (!/^sticky-\d+$/.test(stickySlug)) {
-          console.warn(`Unexpected sticky slug format: "${stickySlug}" from nodeId "${nodeId}". Skipping position update.`);
-          continue;
-        }
-        onStickyPositionChange(stickySlug, position);
-      } else {
-        onNotePositionChange(nodeId, position);
       }
-    }
 
     // Detect section membership changes for notes
     if (onNoteSectionChange) {
@@ -249,7 +237,7 @@ export function useCanvasNodeDrag<T extends Record<string, unknown>>({
     if (draggedSectionRef.current && onNoteSectionChange) {
       const draggedSectionNode = nodeMap.get(draggedSectionRef.current);
       if (draggedSectionNode && draggedSectionNode.type === 'section') {
-        const sectionData = draggedSectionNode.data as { slug: string };
+        const sectionData = draggedSectionNode.data as unknown as { slug: string };
         const sectionSlug = sectionData.slug;
         
         // Find all notes and check if they're now inside this section
