@@ -30,7 +30,7 @@ import { useCanvasTouchGestures } from '../../hooks/useCanvasTouchGestures';
 import { useCanvasNodeDrag } from '../../hooks/useCanvasNodeDrag';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { isTouchDevice } from '../../utils/platform.js';
-import type { Note, Position, CanvasImage, CategoryMeta, CanvasTool, Section, Sticky, StickyColor } from '../../types';
+import type { NoteFile, Position, CanvasImage, KbMeta, CanvasTool, Section, Sticky, StickyColor } from '../../types';
 import type { PlacementType } from '../../contexts/PlacementContext.js';
 import type { Settings } from '../../hooks/useSettings';
 import styles from './Canvas.module.css';
@@ -52,15 +52,15 @@ export interface FocusOnNodeOptions {
 }
 
 interface CanvasProps {
-  notes: Note[];
+  notes: NoteFile[];
   images: CanvasImage[];
   sections: Section[];
   stickies: Sticky[];
-  categories: CategoryMeta[];
+  categories: KbMeta[];
   activeTool?: CanvasTool;
   isPlacementMode?: boolean;
   onPlacementClick?: (position: Position, nodes?: Node<CanvasNodeData>[]) => void;
-  onNoteOpen: (slug: string, category: string, originRect: OriginRect) => void;
+  onNoteOpen: (notePath: string, originRect: OriginRect) => void;
   onNotePositionChange: (slug: string, position: Position) => void;
   onImagePositionChange: (id: string, position: Position) => void;
   onImageResize: (id: string, width: number, height: number) => void;
@@ -69,7 +69,7 @@ interface CanvasProps {
   onImagesDelete: (ids: string[]) => Promise<void>;
   onNoteDuplicate: (slug: string, position: Position) => Promise<void>;
   onImageDuplicate: (id: string, position: Position) => Promise<void>;
-  onNoteMoveToCategory?: (slug: string, category: string) => Promise<Note | null>;
+  onNoteMoveToCategory?: (slug: string, category: string) => Promise<NoteFile | null>;
   onImageMoveToCategory?: (id: string, category: string) => Promise<boolean>;
   onNoteSectionChange?: (noteSlug: string, sectionSlug: string | null) => void;
   // Section handlers
@@ -266,7 +266,7 @@ function CanvasInner({
 
     // Sections render first (behind everything else)
     const sectionNodes: Node<SectionNodeData>[] = sections.map((section, index) => ({
-      id: `section-${section.slug}`,
+      id: `section-${section.id}`,
       type: 'section',
       position: section.position || getDefaultPosition(index),
       data: {
@@ -280,24 +280,18 @@ function CanvasInner({
       zIndex: -1, // Ensure sections are behind other nodes
     }));
 
-    const noteNodes: Node<NoteNodeData>[] = notes.map((note, index) => {
-      const categoryMeta = categories.find(c => c.name === note.category);
-      const categoryDisplayName = categoryMeta?.displayName || note.category;
-
-      return {
-        id: note.slug,
-        type: 'note',
-        position: note.position || getDefaultPosition(index),
-        data: {
-          ...note,
-          categoryDisplayName,
-          onOpen: onNoteOpen,
-          isPanMode,
-        },
-        draggable: !isPanMode,
-        selected: false,
-      };
-    });
+    const noteNodes: Node<NoteNodeData>[] = notes.map((note, index) => ({
+      id: `note-${note.filename}`,
+      type: 'note',
+      position: note.position || getDefaultPosition(index),
+      data: {
+        ...note,
+        onOpen: onNoteOpen,
+        isPanMode,
+      },
+      draggable: !isPanMode,
+      selected: false,
+    }));
 
     const imageNodes: Node<ImageNodeData>[] = images.map((image, index) => ({
       id: `image-${image.id}`,
@@ -315,7 +309,7 @@ function CanvasInner({
     }));
 
     const stickyNodes: Node<StickyNodeData>[] = stickies.map((sticky, index) => ({
-      id: `sticky-${sticky.slug}`,
+      id: `sticky-${sticky.id}`,
       type: 'sticky',
       position: sticky.position || getDefaultPosition(notes.length + images.length + index),
       data: {
@@ -332,10 +326,10 @@ function CanvasInner({
   }, [notes, images, sections, stickies, categories, onNoteOpen, onImageResize, onSectionResize, onSectionRename, onStickyTextChange, isTouch, activeTool]);
 
   const nodeStructureKey = useMemo(() => {
-    const noteKey = notes.map(n => `${n.slug}:${n.category}`).join('|');
+    const noteKey = notes.map(n => `${n.filename}:${n.kb}`).join('|');
     const imageKey = images.map(i => `${i.id}:${i.displayWidth}:${i.status}`).join('|');
-    const sectionKey = sections.map(s => `${s.slug}:${s.width}:${s.height}`).join('|');
-    const stickyKey = stickies.map(s => `${s.slug}:${s.color}`).join('|');
+    const sectionKey = sections.map(s => `${s.id}:${s.width}:${s.height}`).join('|');
+    const stickyKey = stickies.map(s => `${s.id}:${s.color}`).join('|');
     return `${noteKey}::${imageKey}::${sectionKey}::${stickyKey}`;
   }, [notes, images, sections, stickies]);
 
@@ -360,10 +354,10 @@ function CanvasInner({
 
   // Sync node data when content changes
   useEffect(() => {
-    const noteDataMap = new Map(notes.map(n => [n.slug, n]));
+    const noteDataMap = new Map(notes.map(n => [`note-${n.filename}`, n]));
     const imageDataMap = new Map(images.map(i => [`image-${i.id}`, i]));
-    const sectionDataMap = new Map(sections.map(s => [`section-${s.slug}`, s]));
-    const stickyDataMap = new Map(stickies.map(s => [`sticky-${s.slug}`, s]));
+    const sectionDataMap = new Map(sections.map(s => [`section-${s.id}`, s]));
+    const stickyDataMap = new Map(stickies.map(s => [`sticky-${s.id}`, s]));
 
     setNodes(currentNodes =>
       currentNodes.map(node => {
@@ -711,7 +705,7 @@ function CanvasInner({
     const totalCount = notesToDelete.length + imagesToDelete.length + sectionsToDelete.length + stickiesToDelete.length;
     if (totalCount === 1) {
       if (notesToDelete.length === 1) {
-        const note = notes.find(n => n.slug === notesToDelete[0]);
+        const note = notes.find(n => `note-${n.filename}` === notesToDelete[0]);
         return `Are you sure you want to delete "${note?.title || 'Untitled'}"?`;
       } else if (imagesToDelete.length === 1) {
         return `Are you sure you want to delete this image?`;

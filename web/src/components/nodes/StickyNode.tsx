@@ -72,9 +72,9 @@ function StickyNodeComponent({ data, selected }: StickyNodeProps) {
     setIsEditing(false);
     // Always save the text when exiting edit mode
     if (data.onTextChange && editText !== data.text) {
-      data.onTextChange(data.slug, editText);
+      data.onTextChange(data.id, editText);
     }
-  }, [editText, data.text, data.onTextChange, data.slug]);
+  }, [editText, data.text, data.onTextChange, data.id]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {

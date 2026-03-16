@@ -2,54 +2,43 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Editor } from '../Editor';
 import { Dialog } from '../Dialog';
 import { TagInput } from '../TagInput';
-import type { Note, CategoryMeta, Section } from '../../types';
+import type { NoteFile } from '../../types';
 import type { OriginRect } from '../Canvas';
 import styles from './NoteEditor.module.css';
 
 interface NoteEditorProps {
-  slug: string;
+  kb: string;
+  notePath: string;
   originRect: OriginRect | null;
-  categories: CategoryMeta[];
-  sections?: Section[];
-  initialNote?: Note | null; // Optional - skip loading if provided
+  initialNote?: NoteFile | null;
   sidebarOpen?: boolean;
   onClose: () => void;
-  onSave: (slug: string, content: string, title: string, tags: string[]) => Promise<void>;
-  onDelete: (slug: string) => Promise<void>;
-  onMoveToCategory: (slug: string, category: string) => Promise<Note | null>;
-  onMoveToSection?: (slug: string, sectionSlug: string | null) => Promise<Note | null>;
-  getNote: (slug: string) => Promise<Note | null>;
+  onSave: (kb: string, notePath: string, content: string, title: string, tags: string[]) => Promise<void>;
+  onDelete: (kb: string, notePath: string) => Promise<void>;
+  getNote: (kb: string, path: string) => Promise<NoteFile | null>;
 }
 
-const AUTOSAVE_DELAY = 1500; // 1.5 seconds after user stops typing
+const AUTOSAVE_DELAY = 1500;
 
-export function NoteEditor({ slug, originRect, categories, sections = [], initialNote, sidebarOpen, onClose, onSave, onDelete, onMoveToCategory, onMoveToSection, getNote }: NoteEditorProps) {
-  const [note, setNote] = useState<Note | null>(initialNote || null);
+export function NoteEditor({ kb, notePath, originRect, initialNote, sidebarOpen, onClose, onSave, onDelete, getNote }: NoteEditorProps) {
+  const [note, setNote] = useState<NoteFile | null>(initialNote || null);
   const [loading, setLoading] = useState(!initialNote);
   const [title, setTitle] = useState(initialNote?.title || '');
   const [content, setContent] = useState(initialNote?.content || '');
   const [tags, setTags] = useState<string[]>(initialNote?.tags || []);
-  const [category, setCategory] = useState(initialNote?.category || '');
-  const [section, setSection] = useState<string | undefined>(initialNote?.section);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
 
-  // Refs to track latest values for autosave
   const titleRef = useRef(title);
   const contentRef = useRef(content);
   const tagsRef = useRef(tags);
   const hasChangesRef = useRef(hasChanges);
   const savingRef = useRef(saving);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-  const sectionDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Keep refs in sync
   useEffect(() => { titleRef.current = title; }, [title]);
   useEffect(() => { contentRef.current = content; }, [content]);
   useEffect(() => { tagsRef.current = tags; }, [tags]);
@@ -58,46 +47,37 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
 
   // Trigger expand animation on mount
   useEffect(() => {
-    // Small delay to ensure initial styles are applied before animation
     const timer = requestAnimationFrame(() => {
       setIsExpanded(true);
     });
     return () => cancelAnimationFrame(timer);
   }, []);
 
-  // Update state when switching to a different note (slug or initialNote changes)
+  // Update state when switching notes
   useEffect(() => {
     if (initialNote) {
       setNote(initialNote);
       setTitle(initialNote.title);
       setContent(initialNote.content);
       setTags(initialNote.tags || []);
-      setCategory(initialNote.category || '');
-      setSection(initialNote.section);
       setLoading(false);
       setHasChanges(false);
       setLastSaved(null);
     }
-  }, [slug, initialNote]);
+  }, [notePath, initialNote]);
 
   useEffect(() => {
-    // Skip loading if we already have the note from initialNote
     if (initialNote) return;
     
     const loadNote = async () => {
       setLoading(true);
       try {
-        const fetchedNote = await getNote(slug);
+        const fetchedNote = await getNote(kb, notePath);
         if (fetchedNote) {
-          console.log('Loaded note from API:', fetchedNote.slug, 'Content length:', fetchedNote.content?.length);
           setNote(fetchedNote);
           setTitle(fetchedNote.title);
           setContent(fetchedNote.content);
           setTags(fetchedNote.tags || []);
-          setCategory(fetchedNote.category || 'all-notes');
-          setSection(fetchedNote.section);
-        } else {
-          console.warn('Note not found:', slug);
         }
       } catch (error) {
         console.error('Failed to load note:', error);
@@ -105,24 +85,7 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
       setLoading(false);
     };
     loadNote();
-  }, [slug, getNote, initialNote]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!categoryDropdownOpen && !sectionDropdownOpen) return;
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownOpen && categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
-        setCategoryDropdownOpen(false);
-      }
-      if (sectionDropdownOpen && sectionDropdownRef.current && !sectionDropdownRef.current.contains(e.target as Node)) {
-        setSectionDropdownOpen(false);
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [categoryDropdownOpen, sectionDropdownOpen]);
+  }, [kb, notePath, getNote, initialNote]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
@@ -143,30 +106,25 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
     if (!hasChangesRef.current || savingRef.current) return;
     setSaving(true);
     try {
-      await onSave(slug, contentRef.current, titleRef.current, tagsRef.current);
+      await onSave(kb, notePath, contentRef.current, titleRef.current, tagsRef.current);
       setHasChanges(false);
       setLastSaved(new Date());
     } finally {
       setSaving(false);
     }
-  }, [slug, onSave]);
+  }, [kb, notePath, onSave]);
 
   // Debounced autosave
   useEffect(() => {
     if (!hasChanges || saving) return;
-
-    const timer = setTimeout(() => {
-      handleSave();
-    }, AUTOSAVE_DELAY);
-
+    const timer = setTimeout(() => { handleSave(); }, AUTOSAVE_DELAY);
     return () => clearTimeout(timer);
   }, [hasChanges, saving, title, content, tags, handleSave]);
 
   const handleClose = useCallback(() => {
     if (hasChangesRef.current && !savingRef.current) {
-      // Save before closing if there are unsaved changes
       setSaving(true);
-      onSave(slug, contentRef.current, titleRef.current, tagsRef.current).finally(() => {
+      onSave(kb, notePath, contentRef.current, titleRef.current, tagsRef.current).finally(() => {
         setSaving(false);
         setIsClosing(true);
         setIsExpanded(false);
@@ -177,7 +135,7 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
       setIsExpanded(false);
       setTimeout(onClose, 300);
     }
-  }, [slug, onSave, onClose]);
+  }, [kb, notePath, onSave, onClose]);
 
   const handleDeleteClick = useCallback(() => {
     setDeleteDialogOpen(true);
@@ -185,75 +143,14 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
 
   const handleDeleteConfirm = useCallback(async () => {
     setDeleteDialogOpen(false);
-    await onDelete(slug);
+    await onDelete(kb, notePath);
     onClose();
-  }, [slug, onDelete, onClose]);
+  }, [kb, notePath, onDelete, onClose]);
 
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false);
   }, []);
 
-  const handleCategorySelect = useCallback(async (newCategory: string) => {
-    setCategoryDropdownOpen(false);
-    if (newCategory === category) return;
-    
-    // Save any pending changes first
-    if (hasChangesRef.current && !savingRef.current) {
-      setSaving(true);
-      await onSave(slug, contentRef.current, titleRef.current, tagsRef.current);
-      setHasChanges(false);
-      setSaving(false);
-    }
-    
-    // Move to new category
-    const result = await onMoveToCategory(slug, newCategory);
-    if (result) {
-      setCategory(newCategory);
-      // Close the editor since the note is now in a different category
-      setIsClosing(true);
-      setIsExpanded(false);
-      setTimeout(onClose, 300);
-    }
-  }, [slug, category, onSave, onMoveToCategory, onClose]);
-
-  const handleSectionSelect = useCallback(async (newSectionSlug: string | null) => {
-    setSectionDropdownOpen(false);
-    if (newSectionSlug === section) return;
-    if (!onMoveToSection) return;
-    
-    // Save any pending changes first
-    if (hasChangesRef.current && !savingRef.current) {
-      setSaving(true);
-      await onSave(slug, contentRef.current, titleRef.current, tagsRef.current);
-      setHasChanges(false);
-      setSaving(false);
-    }
-    
-    // Move to new section (or clear section)
-    const result = await onMoveToSection(slug, newSectionSlug);
-    if (result) {
-      setSection(newSectionSlug || undefined);
-    }
-  }, [slug, section, onSave, onMoveToSection]);
-
-  // Get sections available for this note's category
-  const availableSections = sections.filter(s => s.category === category);
-
-  // Get display name for current section
-  const getSectionDisplayName = (sectionSlug: string | undefined) => {
-    if (!sectionSlug) return 'None';
-    const sec = availableSections.find(s => s.slug === sectionSlug);
-    return sec?.name || sectionSlug;
-  };
-
-  // Get display name for current category
-  const getCategoryDisplayName = (catSlug: string) => {
-    if (catSlug === 'all-notes') return 'All Notes';
-    const cat = categories.find(c => c.name === catSlug);
-    return cat?.displayName || catSlug;
-  };
-
-  // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -269,21 +166,11 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
     }
   };
 
-  // Handle Escape key and Cmd+S
+  // Escape and Cmd+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if delete dialog is open
       if (deleteDialogOpen) return;
-      
-      if (e.key === 'Escape') {
-        if (categoryDropdownOpen) {
-          setCategoryDropdownOpen(false);
-        } else if (sectionDropdownOpen) {
-          setSectionDropdownOpen(false);
-        } else {
-          handleClose();
-        }
-      }
+      if (e.key === 'Escape') handleClose();
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
@@ -291,21 +178,15 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose, handleSave, deleteDialogOpen, categoryDropdownOpen, sectionDropdownOpen]);
+  }, [handleClose, handleSave, deleteDialogOpen]);
 
-  // Calculate initial transform based on originRect
   const getInitialStyle = () => {
-    if (!originRect || isExpanded) {
-      return {};
-    }
+    if (!originRect || isExpanded) return {};
     
-    // Calculate scale and position to match origin card
     const targetWidth = window.innerWidth;
     const targetHeight = window.innerHeight;
     const scaleX = originRect.width / targetWidth;
     const scaleY = originRect.height / targetHeight;
-    
-    // Calculate translate to position at origin
     const translateX = originRect.x + originRect.width / 2 - targetWidth / 2;
     const translateY = originRect.y + originRect.height / 2 - targetHeight / 2;
     
@@ -339,7 +220,7 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
       className={`${styles['note-editor-fullscreen']} ${isExpanded ? styles['expanded'] : ''} ${isClosing ? styles['closing'] : ''}`}
       style={isExpanded ? {} : getInitialStyle()}
     >
-      {/* Fixed header with back button and toolbar */}
+      {/* Fixed header */}
       <div className={`${styles['note-editor-topbar']} ${sidebarOpen ? styles['sidebar-open'] : ''}`}>
         <button className={styles['note-editor-back']} onClick={handleClose} title="Close (Esc)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -374,97 +255,23 @@ export function NoteEditor({ slug, originRect, categories, sections = [], initia
             className={styles['note-editor-title']}
             placeholder="Untitled"
           />
-          
-          {/* Category selector */}
-          <div className={styles['note-editor-category-row']}>
-            <div className={styles['note-editor-category-wrapper']} ref={categoryDropdownRef}>
-              <button 
-                className={styles['note-editor-category-btn']}
-                onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                </svg>
-                <span>{getCategoryDisplayName(category)}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-              
-              {categoryDropdownOpen && (
-                <div className={styles['note-editor-category-dropdown']}>
-                  <button
-                    className={`${styles['note-editor-category-option']} ${category === 'all-notes' ? styles['active'] : ''}`}
-                    onClick={() => handleCategorySelect('all-notes')}
-                  >
-                    All Notes
-                  </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat.name}
-                      className={`${styles['note-editor-category-option']} ${category === cat.name ? styles['active'] : ''}`}
-                      onClick={() => handleCategorySelect(cat.name)}
-                    >
-                      {cat.displayName}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Section selector (only show if there are sections in this category) */}
-          {availableSections.length > 0 && (
-            <div className={styles['note-editor-section-row']}>
-              <div className={styles['note-editor-section-wrapper']} ref={sectionDropdownRef}>
-                <button 
-                  className={styles['note-editor-section-btn']}
-                  onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                  </svg>
-                  <span>{getSectionDisplayName(section)}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </button>
-                
-                {sectionDropdownOpen && (
-                  <div className={styles['note-editor-section-dropdown']}>
-                    <button
-                      className={`${styles['note-editor-section-option']} ${!section ? styles['active'] : ''}`}
-                      onClick={() => handleSectionSelect(null)}
-                    >
-                      None
-                    </button>
-                    {availableSections.map(sec => (
-                      <button
-                        key={sec.slug}
-                        className={`${styles['note-editor-section-option']} ${section === sec.slug ? styles['active'] : ''}`}
-                        onClick={() => handleSectionSelect(sec.slug)}
-                      >
-                        {sec.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Date metadata */}
+          {/* File path + date */}
           <div className={styles['note-editor-dates']}>
+            <span className={styles['note-editor-date']}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              {kb}/{notePath}
+            </span>
+            <span className={styles['note-editor-date-separator']}>·</span>
             <span className={styles['note-editor-date']}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              Updated {formatDate(note.updatedAt)}
-            </span>
-            <span className={styles['note-editor-date-separator']}>·</span>
-            <span className={styles['note-editor-date']}>
-              Created {formatDate(note.createdAt)}
+              Modified {formatDate(note.mtime)}
             </span>
           </div>
           

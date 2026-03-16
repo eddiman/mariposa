@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Node } from '@xyflow/react';
-import type { Position, CategoryMeta, StickyColor } from '../types';
+import type { Position, KbMeta, StickyColor } from '../types';
 import type { ContextMenuItem } from '../components/ContextMenu';
 
 interface ContextMenuState {
@@ -12,7 +12,7 @@ interface ContextMenuState {
 
 interface UseCanvasContextMenuProps<T extends Record<string, unknown>> {
   nodes: Node<T>[];
-  categories: CategoryMeta[];
+  categories: KbMeta[];
   screenToFlowPosition: (position: { x: number; y: number }) => Position;
   canUndo: boolean;
   canRedo: boolean;
@@ -199,7 +199,7 @@ export function useCanvasContextMenu<T extends Record<string, unknown>>({
           },
         },
         ...categories.map(cat => ({
-          label: cat.displayName,
+          label: cat.name,
           onClick: async () => {
             for (const n of selectedNotes) {
               if (onNoteMoveToCategory) await onNoteMoveToCategory(n.id, cat.name);

@@ -18,7 +18,7 @@ import { useNotes } from './hooks/useNotes';
 import { useImages } from './hooks/useImages';
 import { useSettings } from './hooks/useSettings';
 import { EditorProvider, useEditor, PlacementProvider, usePlacement } from './contexts';
-import type { Position, NoteFile, StickyColor } from './types';
+import type { Position, StickyColor, NoteFile } from './types';
 
 function AppContent() {
   const {
@@ -69,7 +69,6 @@ function AppContent() {
     stickies,
     loading: loadingFolder,
     refetch: refetchFolder,
-    updateItemMeta,
     updateItemPosition,
     createSection,
     updateSection,
@@ -80,6 +79,28 @@ function AppContent() {
   } = useFolder(folderOptions);
 
   const { images, uploadImage, updateImagePosition, updateImageSize, deleteImage } = useImages({ kb: currentKb });
+
+  // Build NoteFile[] from folder entries + metadata for the canvas
+  const canvasNotes: NoteFile[] = useMemo(() => {
+    if (!meta || !currentKb) return [];
+    return entries
+      .filter(e => e.type === 'file' && e.name.endsWith('.md'))
+      .map(e => {
+        const itemMeta = meta.items[e.name] || {};
+        return {
+          filename: e.name,
+          path: currentPath ? `${currentPath}/${e.name}` : e.name,
+          kb: currentKb,
+          content: '', // Content loaded on demand when opening
+          title: itemMeta.title || e.name.replace(/\.md$/, ''),
+          tags: itemMeta.tags || [],
+          position: itemMeta.position,
+          section: itemMeta.section,
+          size: e.size || 0,
+          mtime: e.mtime || '',
+        };
+      });
+  }, [entries, meta, currentKb, currentPath]);
 
   // === Note handlers ===
 
@@ -279,23 +300,34 @@ function AppContent() {
           />
         ) : (
           <Canvas
-            entries={entries}
-            meta={meta}
+            notes={canvasNotes}
             images={images}
             sections={sections}
             stickies={stickies}
-            currentKb={currentKb}
-            currentPath={currentPath}
+            categories={kbs}
             activeTool="pan"
             isPlacementMode={isPlacementMode}
             onPlacementClick={handlePlacementClick}
             onNoteOpen={handleNoteOpen}
-            onFolderOpen={handleFolderOpen}
-            onItemPositionChange={handleItemPositionChange}
+            onNotePositionChange={(nodeId, position) => {
+              const filename = nodeId.replace('note-', '');
+              handleItemPositionChange(filename, position);
+            }}
             onImagePositionChange={handleImagePositionChange}
             onImageResize={handleImageResize}
             onImagePaste={handleImagePaste}
+            onNotesDelete={async (ids) => {
+              if (!currentKb) return;
+              for (const id of ids) {
+                const filename = id.replace('note-', '');
+                const notePath = currentPath ? `${currentPath}/${filename}` : filename;
+                await deleteNote(currentKb, notePath);
+              }
+              refetchFolder();
+            }}
             onImagesDelete={handleImagesDelete}
+            onNoteDuplicate={async () => {}}
+            onImageDuplicate={async () => {}}
             onSectionCreate={handleSectionCreate}
             onSectionPositionChange={handleSectionPositionChange}
             onSectionResize={handleSectionResize}
@@ -307,7 +339,7 @@ function AppContent() {
             onStickyTextChange={handleStickyTextChange}
             onStickyColorChange={handleStickyColorChange}
             onStickiesDelete={handleStickiesDelete}
-            onNoteCreate={handleNoteCreate}
+            onEnterPlacementMode={enterPlacementMode}
             loading={loadingFolder}
             settings={settings}
           />

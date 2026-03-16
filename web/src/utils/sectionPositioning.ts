@@ -167,7 +167,7 @@ export function getSectionContainingNode(
 ): string | undefined {
   for (const section of sections) {
     if (isNodeInsideSection(node, section, section.position)) {
-      return section.slug;
+      return section.id;
     }
   }
   return undefined;
@@ -191,8 +191,8 @@ export function getNotesForSectionUpdate(
     if (node.type !== 'note') continue;
 
     const noteData = node.data as { section?: string };
-    const isCurrentlyInSection = noteData.section === section.slug;
-    const isInOtherSection = noteData.section && noteData.section !== section.slug;
+    const isCurrentlyInSection = noteData.section === section.id;
+    const isInOtherSection = noteData.section && noteData.section !== section.id;
 
     // Skip notes that are in other sections (unless we're implementing section switching)
     if (isInOtherSection) continue;

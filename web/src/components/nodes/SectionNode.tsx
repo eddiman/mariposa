@@ -100,7 +100,7 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
 
     const handleMouseUp = () => {
       if (resizeStartRef.current && data.onResize) {
-        data.onResize(data.slug, currentSizeRef.current.width, currentSizeRef.current.height);
+        data.onResize(data.id, currentSizeRef.current.width, currentSizeRef.current.height);
       }
       resizeStartRef.current = null;
       setIsResizing(false);
@@ -111,7 +111,7 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [data.isPanMode, data.onResize, data.slug, zoom]);
+  }, [data.isPanMode, data.onResize, data.id, zoom]);
 
   // Touch event handler for resize
   const handleTouchStart = useCallback((e: React.TouchEvent, corner: ResizeCorner) => {
@@ -161,7 +161,7 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
 
     const handleTouchEnd = () => {
       if (resizeStartRef.current && data.onResize) {
-        data.onResize(data.slug, currentSizeRef.current.width, currentSizeRef.current.height);
+        data.onResize(data.id, currentSizeRef.current.width, currentSizeRef.current.height);
       }
       resizeStartRef.current = null;
       setIsResizing(false);
@@ -172,7 +172,7 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
 
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
-  }, [data.isPanMode, data.onResize, data.slug, zoom]);
+  }, [data.isPanMode, data.onResize, data.id, zoom]);
 
   const handleNameClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -184,9 +184,9 @@ function SectionNodeComponent({ data, selected }: SectionNodeProps) {
   const handleNameBlur = useCallback(() => {
     setIsEditing(false);
     if (editName.trim() !== data.name && data.onRename) {
-      data.onRename(data.slug, editName.trim() || 'Section');
+      data.onRename(data.id, editName.trim() || 'Section');
     }
-  }, [editName, data.name, data.onRename, data.slug]);
+  }, [editName, data.name, data.onRename, data.id]);
 
   const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

@@ -42,10 +42,6 @@ interface UseFolderReturn {
   deleteSticky: (id: string) => Promise<boolean>;
 }
 
-function sidecarDefault(): MariposaSidecar {
-  return { items: {}, sections: {}, stickies: {}, nextSectionId: 1, nextStickyId: 1 };
-}
-
 function sectionsFromMeta(meta: MariposaSidecar): Section[] {
   return Object.entries(meta.sections).map(([id, s]) => ({ id, ...s }));
 }

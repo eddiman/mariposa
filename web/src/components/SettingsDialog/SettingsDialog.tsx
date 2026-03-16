@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react';
-import type { Settings, Theme } from '../../hooks/useSettings';
+import { useEffect, useCallback, useState } from 'react';
+import type { Settings, Theme } from '../../types';
 import styles from './SettingsDialog.module.css';
 
 interface SettingsDialogProps {
@@ -7,6 +7,7 @@ interface SettingsDialogProps {
   settings: Settings;
   onSettingChange: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   onClose: () => void;
+  onKbRootSaved?: () => void;
 }
 
 export function SettingsDialog({
@@ -14,8 +15,17 @@ export function SettingsDialog({
   settings,
   onSettingChange,
   onClose,
+  onKbRootSaved,
 }: SettingsDialogProps) {
-  // Handle Escape key to close
+  const [kbRootInput, setKbRootInput] = useState(settings.kbRoot || '');
+  const [kbRootError, setKbRootError] = useState<string | null>(null);
+  const [kbRootSaving, setKbRootSaving] = useState(false);
+
+  // Sync input when settings load
+  useEffect(() => {
+    setKbRootInput(settings.kbRoot || '');
+  }, [settings.kbRoot]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
@@ -29,6 +39,30 @@ export function SettingsDialog({
       return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
     }
   }, [open, handleKeyDown]);
+
+  const handleKbRootSave = useCallback(async () => {
+    if (!kbRootInput.trim()) return;
+    setKbRootSaving(true);
+    setKbRootError(null);
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kbRoot: kbRootInput.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setKbRootError(data.error || 'Failed to save');
+        return;
+      }
+      onSettingChange('kbRoot', kbRootInput.trim());
+      if (onKbRootSaved) onKbRootSaved();
+    } catch (err) {
+      setKbRootError('Failed to connect to server');
+    } finally {
+      setKbRootSaving(false);
+    }
+  }, [kbRootInput, onSettingChange, onKbRootSaved]);
 
   if (!open) return null;
 
@@ -45,6 +79,41 @@ export function SettingsDialog({
         </div>
         
         <div className={styles['settings-content']}>
+          {/* KB Root Directory */}
+          <div className={styles['settings-section']}>
+            <h3 className={styles['settings-section-title']}>Knowledge Bases</h3>
+            
+            <div className={styles['settings-field']}>
+              <span className={styles['settings-select-label']}>
+                <span className={styles['settings-select-title']}>KB Root Directory</span>
+                <span className={styles['settings-select-description']}>
+                  Parent directory containing your knowledge bases (folders with kb.yaml)
+                </span>
+              </span>
+              <div className={styles['settings-kb-root']}>
+                <input
+                  type="text"
+                  value={kbRootInput}
+                  onChange={e => { setKbRootInput(e.target.value); setKbRootError(null); }}
+                  placeholder="/path/to/knowledge-bases"
+                  className={styles['settings-text-input']}
+                  onKeyDown={e => { if (e.key === 'Enter') handleKbRootSave(); }}
+                />
+                <button
+                  className={styles['settings-kb-root-save']}
+                  onClick={handleKbRootSave}
+                  disabled={kbRootSaving || !kbRootInput.trim()}
+                >
+                  {kbRootSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              {kbRootError && (
+                <span className={styles['settings-error']}>{kbRootError}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Appearance */}
           <div className={styles['settings-section']}>
             <h3 className={styles['settings-section-title']}>Appearance</h3>
             
@@ -66,6 +135,7 @@ export function SettingsDialog({
             </div>
           </div>
           
+          {/* Canvas */}
           <div className={styles['settings-section']}>
             <h3 className={styles['settings-section-title']}>Canvas</h3>
             

@@ -165,6 +165,72 @@
   transform: translateX(1.25rem);
 }
 
+/* === Text Input (KB Root) === */
+.settings-field {
+  padding: var(--spacing-3) 0;
+  border-bottom: 0.0625rem solid var(--color-border);
+}
+
+.settings-field:last-child {
+  border-bottom: none;
+}
+
+.settings-kb-root {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+}
+
+.settings-text-input {
+  flex: 1;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 0.0625rem solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  transition: border-color var(--transition-fast);
+}
+
+.settings-text-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.settings-text-input::placeholder {
+  color: var(--color-placeholder);
+}
+
+.settings-kb-root-save {
+  padding: var(--spacing-2) var(--spacing-4);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.settings-kb-root-save:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.settings-kb-root-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-error {
+  display: block;
+  margin-top: var(--spacing-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-danger-bright);
+}
+
 /* === Select Input (Theme Selector) === */
 .settings-select {
   display: flex;

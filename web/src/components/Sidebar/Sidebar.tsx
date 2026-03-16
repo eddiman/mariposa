@@ -1,281 +1,98 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { isMobileViewport } from '../../utils/platform.js';
-import { useCategoryNotes } from '../../hooks/useCategoryNotes.js';
-import { SidebarAllNotes } from './SidebarAllNotes.js';
-import { SidebarCategoryItem } from './SidebarCategoryItem.js';
-import { SidebarCategoryView } from './SidebarCategoryView.js';
-import { SidebarAllNotesView } from './SidebarAllNotesView.js';
-import type { CategoryMeta, NoteMeta, Section } from '../../types';
+import type { KbMeta, FolderEntry, MariposaSidecar } from '../../types';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;
-  categories: CategoryMeta[];
-  sections?: Section[];
-  currentSpace: string | null;
-  onSpaceChange: (space: string | null) => void;
+  kbs: KbMeta[];
+  currentKb: string | null;
+  currentPath: string;
+  entries: FolderEntry[];
+  meta: MariposaSidecar | null;
+  onKbSelect: (kb: string | null) => void;
+  onFolderOpen: (folderName: string) => void;
+  onNoteOpen: (notePath: string) => void;
   onSettingsClick: () => void;
-  onCreateCategory: () => void;
-  onRenameCategory: (category: CategoryMeta) => void;
-  onDeleteCategory: (category: CategoryMeta) => void;
-  onNoteClick: (category: string, slug: string) => void;
-  onNoteEdit: (slug: string) => void;
-  onAddNote: (category: string) => Promise<NoteMeta | null>;
-  onSectionClick?: (sectionSlug: string) => void;
-  onNoteUpdateRef?: (handler: (slug: string, updates: Partial<NoteMeta>) => void) => void;
+  onNavigateToFolder: (kb: string, path: string) => void;
   loading?: boolean;
-  refetchTrigger?: number;
 }
 
 export function Sidebar({
   open,
   onToggle,
-  categories,
-  sections = [],
-  currentSpace,
-  onSpaceChange,
+  kbs,
+  currentKb,
+  currentPath,
+  entries,
+  onKbSelect,
+  onFolderOpen,
+  onNoteOpen,
   onSettingsClick,
-  onCreateCategory,
-  onRenameCategory,
-  onDeleteCategory,
-  onNoteClick,
-  onNoteEdit,
-  onAddNote,
-  onSectionClick,
-  onNoteUpdateRef,
+  onNavigateToFolder,
   loading = false,
-  refetchTrigger = 0,
 }: SidebarProps) {
-  // View state: null = main view, 'all-notes' = all notes view, string = category name for category view
-  const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null);
-  // Track previous view for slide-out animation
-  const [previousCategoryView, setPreviousCategoryView] = useState<string | null>(null);
-  const isTransitioningRef = useRef(false);
-  
-  // Only load notes for the active category view (lazy loading)
-  const expandedCategoriesSet = useMemo(() => {
-    const set = new Set<string>();
-    if (activeCategoryView) set.add(activeCategoryView);
-    if (previousCategoryView) set.add(previousCategoryView);
-    return set;
-  }, [activeCategoryView, previousCategoryView]);
-  
-  const { getNotes, getGroupedNotes, isLoading, addNoteToCategory, updateNoteInCategory } = useCategoryNotes(
-    expandedCategoriesSet,
-    { refetchTrigger, currentSpace }
-  );
-
-  // Expose updateNoteInCategory to parent via ref callback
+  // Sync expanded state with currentKb
   useEffect(() => {
-    if (onNoteUpdateRef) {
-      onNoteUpdateRef(updateNoteInCategory);
-    }
-  }, [onNoteUpdateRef, updateNoteInCategory]);
+    // Future: could expand/collapse KB sections here
+  }, [currentKb]);
 
-  // Get the active category metadata (for regular categories, not 'all-notes')
-  const activeCategory = useMemo(() => {
-    if (!activeCategoryView || activeCategoryView === 'all-notes') return null;
-    return categories.find(c => c.name === activeCategoryView) || null;
-  }, [activeCategoryView, categories]);
+  const handleKbClick = useCallback((kbName: string) => {
+    onKbSelect(kbName);
+    if (isMobileViewport() && open) onToggle();
+  }, [onKbSelect, open, onToggle]);
 
-  // Get the previous category metadata for slide-out animation
-  const previousCategory = useMemo(() => {
-    if (!previousCategoryView || previousCategoryView === 'all-notes') return null;
-    return categories.find(c => c.name === previousCategoryView) || null;
-  }, [previousCategoryView, categories]);
+  const handleFolderClick = useCallback((folderName: string) => {
+    onFolderOpen(folderName);
+    if (isMobileViewport() && open) onToggle();
+  }, [onFolderOpen, open, onToggle]);
 
-  // Reset drilldown view when the active category is deleted
-  useEffect(() => {
-    if (activeCategoryView && activeCategoryView !== 'all-notes') {
-      const categoryExists = categories.some(c => c.name === activeCategoryView);
-      if (!categoryExists && !loading) {
-        // Category was deleted, go back to main view
-        setActiveCategoryView(null);
-        setPreviousCategoryView(null);
-      }
-    }
-  }, [activeCategoryView, categories, loading]);
-
-  const handleCategoryChevronClick = useCallback((categoryName: string) => {
-    setActiveCategoryView(categoryName);
-  }, []);
-
-  const handleAllNotesChevronClick = useCallback(() => {
-    setActiveCategoryView('all-notes');
-  }, []);
-
-  const handleBackToMain = useCallback(() => {
-    // Store the current view as previous for slide-out animation
-    setPreviousCategoryView(activeCategoryView);
-    isTransitioningRef.current = true;
-    setActiveCategoryView(null);
-    
-    // Clear previous view after animation completes
-    setTimeout(() => {
-      setPreviousCategoryView(null);
-      isTransitioningRef.current = false;
-    }, 250); // Match transition duration
-  }, [activeCategoryView]);
-
-  const handleCategoryTitleClick = useCallback((categoryName: string | null) => {
-    onSpaceChange(categoryName);
-    setActiveCategoryView(categoryName);
-    // Auto-close sidebar on mobile after navigation
-    if (isMobileViewport() && open) {
-      onToggle();
-    }
-  }, [onSpaceChange, open, onToggle]);
-
-  const handleNoteTitleClick = useCallback((category: string, slug: string) => {
-    onNoteClick(category, slug);
-
-    // Auto-close sidebar on mobile after navigation
-    if (isMobileViewport() && open) {
-      onToggle();
-    }
-  }, [onNoteClick, open, onToggle]);
-
-  const handleNoteChevronClick = useCallback((slug: string) => {
-    onNoteEdit(slug);
-  }, [onNoteEdit]);
-
-  const handleAddNote = useCallback(async (category: string) => {
-    const newNote = await onAddNote(category);
-    if (newNote) {
-      addNoteToCategory(newNote);
-    }
-  }, [onAddNote, addNoteToCategory]);
+  const handleNoteClick = useCallback((filename: string) => {
+    const notePath = currentPath ? `${currentPath}/${filename}` : filename;
+    onNoteOpen(notePath);
+    if (isMobileViewport() && open) onToggle();
+  }, [currentPath, onNoteOpen, open, onToggle]);
 
   const handleSettingsClick = useCallback(() => {
     onSettingsClick();
-    // Auto-close sidebar on mobile when opening settings
-    if (isMobileViewport() && open) {
-      onToggle();
-    }
+    if (isMobileViewport() && open) onToggle();
   }, [onSettingsClick, open, onToggle]);
 
-  // Determine if we're in a drilldown view
-  const isInDrilldown = activeCategoryView !== null;
+  const handleBreadcrumbClick = useCallback((index: number) => {
+    if (!currentKb) return;
+    const parts = currentPath.split('/').filter(Boolean);
+    const newPath = parts.slice(0, index).join('/');
+    onNavigateToFolder(currentKb, newPath);
+  }, [currentKb, currentPath, onNavigateToFolder]);
 
-  // Render the drilldown content (category or all-notes view)
-  // Also renders previous view during slide-out transition
-  const renderDrilldownContent = () => {
-    if (loading) {
-      return <div className={styles['sidebar-loading']}>Loading...</div>;
-    }
+  const handleHomeClick = useCallback(() => {
+    onKbSelect(null);
+    if (isMobileViewport() && open) onToggle();
+  }, [onKbSelect, open, onToggle]);
 
-    // Determine which view to render (active or previous during transition)
-    const viewToRender = activeCategoryView || previousCategoryView;
-    const categoryToRender = activeCategory || previousCategory;
-
-    // All Notes drilldown view
-    if (viewToRender === 'all-notes') {
-      return (
-        <SidebarAllNotesView
-          groupedNotes={getGroupedNotes()}
-          isLoading={isLoading('all-notes')}
-          onBack={handleBackToMain}
-          onNoteTitleClick={handleNoteTitleClick}
-          onNoteChevronClick={handleNoteChevronClick}
-        />
-      );
-    }
-
-    // Category drilldown view
-    if (viewToRender && categoryToRender) {
-      // Filter sections for this category
-      const categorySections = sections.filter(s => s.category === viewToRender);
-      
-      return (
-        <SidebarCategoryView
-          category={categoryToRender}
-          notes={getNotes(viewToRender)}
-          sections={categorySections}
-          isLoading={isLoading(viewToRender)}
-          onBack={handleBackToMain}
-          onNoteTitleClick={(slug) => handleNoteTitleClick(viewToRender, slug)}
-          onNoteChevronClick={handleNoteChevronClick}
-          onSectionClick={onSectionClick}
-          onAddNote={() => handleAddNote(viewToRender)}
-          onRenameCategory={() => onRenameCategory(categoryToRender)}
-          onDeleteCategory={() => onDeleteCategory(categoryToRender)}
-        />
-      );
-    }
-
-    return null;
-  };
-
-  // Render the main view (categories list)
-  const renderMainContent = () => {
-    if (loading) {
-      return <div className={styles['sidebar-loading']}>Loading...</div>;
-    }
-
-    return (
-      <>
-        {/* All Notes */}
-        <SidebarAllNotes
-          isActive={currentSpace === null}
-          onTitleClick={() => handleCategoryTitleClick(null)}
-          onChevronClick={handleAllNotesChevronClick}
-        />
-
-        {/* Categories (exclude all-notes - shown as "All Notes" above) */}
-        {categories
-          .filter(category => category.name !== 'all-notes')
-          .map(category => (
-            <SidebarCategoryItem
-              key={category.name}
-              category={category}
-              isActive={currentSpace === category.name}
-              onTitleClick={() => handleCategoryTitleClick(category.name)}
-              onChevronClick={() => handleCategoryChevronClick(category.name)}
-            />
-          ))}
-
-        {/* Create Category button */}
-        <button
-          className={`${styles['sidebar-item']} ${styles['sidebar-create']}`}
-          onClick={onCreateCategory}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v8M8 12h8"/>
-          </svg>
-          <span className={styles['sidebar-item-text']}>New Category</span>
-        </button>
-      </>
-    );
-  };
+  // Build breadcrumb trail
+  const breadcrumbs = currentPath ? currentPath.split('/').filter(Boolean) : [];
 
   return (
     <aside className={`${styles.sidebar} ${open ? styles.open : ''}`}>
-      {/* Toggle button - morphs into sidebar header */}
+      {/* Toggle button */}
       <button 
         className={styles['sidebar-toggle-btn']}
         onClick={onToggle}
-        aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+        aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
       >
         <svg 
-          className={styles['sidebar-toggle-icon']} 
-          width="22" 
-          height="22" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2"
+          className={styles['sidebar-toggle-icon']}
+          width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
         >
           {open ? (
-            // Filled sidebar icon when open (panel highlighted)
             <>
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <rect x="3" y="3" width="6" height="18" rx="1" fill="currentColor" stroke="none"/>
               <path d="M9 3v18"/>
             </>
           ) : (
-            // Sidebar icon when closed
             <>
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <path d="M9 3v18"/>
@@ -284,25 +101,102 @@ export function Sidebar({
         </svg>
       </button>
 
-      {/* Sidebar content - only visible when open */}
+      {/* Sidebar content */}
       <div className={styles['sidebar-content']}>
         <div className={styles['sidebar-header']}>
           <h2 className={styles['sidebar-title']}>Mariposa</h2>
         </div>
 
         <nav className={styles['sidebar-nav']}>
-          {/* Sliding panels container */}
-          <div className={`${styles['sidebar-panels']} ${isInDrilldown ? styles.drilldown : ''}`}>
-            {/* Main panel - categories list */}
-            <div className={`${styles['sidebar-panel']} ${styles['sidebar-panel-main']}`}>
-              {renderMainContent()}
+          {/* Home link */}
+          <button
+            className={`${styles['sidebar-item']} ${!currentKb ? styles.active : ''}`}
+            onClick={handleHomeClick}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span className={styles['sidebar-item-text']}>Home</span>
+          </button>
+
+          {/* KB list */}
+          {kbs.map(kb => (
+            <div key={kb.name} className={styles['sidebar-kb-wrapper']}>
+              <button
+                className={`${styles['sidebar-item']} ${currentKb === kb.name ? styles.active : ''}`}
+                onClick={() => handleKbClick(kb.name)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                </svg>
+                <span className={styles['sidebar-item-text']}>{kb.name}</span>
+              </button>
             </div>
-            
-            {/* Drilldown panel - notes list */}
-            <div className={`${styles['sidebar-panel']} ${styles['sidebar-panel-drilldown']}`}>
-              {(isInDrilldown || previousCategoryView) && renderDrilldownContent()}
+          ))}
+
+          {/* Current folder breadcrumbs + entries */}
+          {currentKb && (
+            <div className={styles['sidebar-folder-section']}>
+              {/* Breadcrumbs */}
+              {breadcrumbs.length > 0 && (
+                <div className={styles['sidebar-breadcrumbs']}>
+                  <button
+                    className={styles['sidebar-breadcrumb']}
+                    onClick={() => handleBreadcrumbClick(0)}
+                  >
+                    {currentKb}
+                  </button>
+                  {breadcrumbs.map((crumb, i) => (
+                    <span key={i}>
+                      <span className={styles['sidebar-breadcrumb-sep']}>/</span>
+                      <button
+                        className={styles['sidebar-breadcrumb']}
+                        onClick={() => handleBreadcrumbClick(i + 1)}
+                      >
+                        {crumb}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Folder entries */}
+              {loading ? (
+                <div className={styles['sidebar-loading']}>Loading...</div>
+              ) : (
+                <div className={styles['sidebar-entries']}>
+                  {entries.map(entry => (
+                    <button
+                      key={entry.name}
+                      className={styles['sidebar-entry']}
+                      onClick={() => entry.type === 'folder' ? handleFolderClick(entry.name) : entry.name.endsWith('.md') ? handleNoteClick(entry.name) : undefined}
+                    >
+                      {entry.type === 'folder' ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        </svg>
+                      ) : entry.name.endsWith('.md') ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                          <line x1="16" y1="13" x2="8" y2="13"/>
+                          <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+                          <polyline points="13 2 13 9 20 9"/>
+                        </svg>
+                      )}
+                      <span className={styles['sidebar-entry-text']}>{entry.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </nav>
 
         {/* Settings at bottom */}
@@ -311,17 +205,11 @@ export function Sidebar({
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <path 
                 d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" 
-                stroke="currentColor" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               />
               <path 
                 d="M16.167 12.5a1.375 1.375 0 00.275 1.517l.05.05a1.667 1.667 0 11-2.359 2.358l-.05-.05a1.375 1.375 0 00-1.516-.275 1.375 1.375 0 00-.834 1.258v.142a1.667 1.667 0 11-3.333 0v-.075a1.375 1.375 0 00-.9-1.258 1.375 1.375 0 00-1.517.275l-.05.05a1.667 1.667 0 11-2.358-2.359l.05-.05a1.375 1.375 0 00.275-1.516 1.375 1.375 0 00-1.258-.834H2.5a1.667 1.667 0 010-3.333h.075a1.375 1.375 0 001.258-.9 1.375 1.375 0 00-.275-1.517l-.05-.05a1.667 1.667 0 112.359-2.358l.05.05a1.375 1.375 0 001.516.275h.067a1.375 1.375 0 00.833-1.258V2.5a1.667 1.667 0 013.334 0v.075a1.375 1.375 0 00.833 1.258 1.375 1.375 0 001.517-.275l.05-.05a1.667 1.667 0 112.358 2.359l-.05.05a1.375 1.375 0 00-.275 1.516v.067a1.375 1.375 0 001.258.833h.142a1.667 1.667 0 010 3.334h-.075a1.375 1.375 0 00-1.258.833z" 
-                stroke="currentColor" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               />
             </svg>
             <span className={styles['sidebar-item-text']}>Settings</span>
