@@ -1,60 +1,65 @@
-import { useState, useEffect, useCallback } from 'react';
-
-export type Theme = 'default' | 'bauhaus';
-
-export interface Settings {
-  snapToObject: boolean;
-  showSnapLines: boolean;
-  theme: Theme;
-}
+import { useCallback, useEffect, useState } from 'react';
+import type { Settings, Theme } from '../types';
 
 const STORAGE_KEY = 'mariposa-settings';
 
-const DEFAULT_SETTINGS: Settings = {
+const defaultSettings: Settings = {
+  theme: 'default',
   snapToObject: true,
   showSnapLines: true,
-  theme: 'default',
 };
 
 function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      return { ...defaultSettings, ...JSON.parse(stored) };
     }
-  } catch (e) {
-    console.warn('Failed to load settings:', e);
+  } catch {
+    // Invalid JSON
   }
-  return DEFAULT_SETTINGS;
+  return defaultSettings;
 }
 
-function saveSettings(settings: Settings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch (e) {
-    console.warn('Failed to save settings:', e);
-  }
-}
+export { type Settings, type Theme };
 
 export function useSettings() {
-  const [settings, setSettingsState] = useState<Settings>(loadSettings);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
 
-  // Save to localStorage whenever settings change
+  // Load kbRoot from server on mount
   useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        if (config.kbRoot) {
+          setSettings(prev => ({ ...prev, kbRoot: config.kbRoot }));
+        }
+      })
+      .catch(() => {
+        // Server not available
+      });
+  }, []);
 
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettingsState(prev => ({ ...prev, [key]: value }));
+    setSettings(prev => {
+      const next = { ...prev, [key]: value };
+
+      // Persist local settings to localStorage
+      const { kbRoot: _, ...localSettings } = next;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localSettings));
+
+      // If kbRoot changed, persist to server
+      if (key === 'kbRoot') {
+        fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kbRoot: value }),
+        }).catch(err => console.error('Failed to save kbRoot:', err));
+      }
+
+      return next;
+    });
   }, []);
 
-  const resetSettings = useCallback(() => {
-    setSettingsState(DEFAULT_SETTINGS);
-  }, []);
-
-  return {
-    settings,
-    updateSetting,
-    resetSettings,
-  };
+  return { settings, updateSetting };
 }

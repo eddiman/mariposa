@@ -1,6 +1,6 @@
 # Architecture
 
-System design documentation for Mariposa.
+System design documentation for Mariposa — a KB (knowledge base) explorer.
 
 ## System Overview
 
@@ -13,17 +13,18 @@ System design documentation for Mariposa.
 │  │                                                   │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌────────────────┐   │  │
 │  │  │  Home   │  │  Canvas  │  │  Editor (overlay)│  │  │
-│  │  │ (search)│  │ (nodes)  │  │  (TipTap)       │  │  │
+│  │  │ (KB     │  │ (folder  │  │  (TipTap,       │  │  │
+│  │  │ browser)│  │  canvas) │  │  (TipTap)        │  │  │
 │  │  └─────────┘  └──────────┘  └────────────────┘   │  │
 │  │                    │                              │  │
 │  │  ┌─────────────────┼────────────────────────┐     │  │
 │  │  │  Custom Hooks   │   Contexts             │     │  │
-│  │  │  useNotes       │   EditorContext        │     │  │
-│  │  │  useImages      │   PlacementContext     │     │  │
-│  │  │  useSections    │   CategoryDialogCtx    │     │  │
-│  │  │  useStickies    │                        │     │  │
+│  │  │  useKbs         │   EditorContext        │     │  │
+│  │  │  useFolder      │   PlacementContext     │     │  │
+│  │  │  useNotes       │                        │     │  │
 │  │  │  useCanvas      │   localStorage         │     │  │
-│  │  │  useSettings    │   (settings, img pos)  │     │  │
+│  │  │  useSettings    │   (theme, snap)        │     │  │
+│  │  │  useImages      │                        │     │  │
 │  │  └─────────────────┼────────────────────────┘     │  │
 │  └────────────────────┼──────────────────────────────┘  │
 │                       │ REST API calls                  │
@@ -32,74 +33,132 @@ System design documentation for Mariposa.
           ┌─────────────┼─────────────────┐
           │     Express API (:3020)        │
           │                               │
-          │  ┌─────────┐  ┌───────────┐   │
-          │  │ Routes   │  │ MCP Server│   │
-          │  │ /api/*   │  │ /mcp      │   │
-          │  └────┬─────┘  └─────┬─────┘   │
-          │       │              │          │
-          │  ┌────┴──────────────┴──────┐  │
-          │  │       Services           │  │
-          │  │  noteService             │  │
-          │  │  imageService (Sharp)    │  │
-          │  │  sectionService          │  │
-          │  │  stickyService           │  │
-          │  └──────────┬───────────────┘  │
-          └─────────────┼──────────────────┘
+          │  ┌─────────────────────────┐  │
+          │  │ Routes                  │  │
+          │  │ /api/config             │  │
+          │  │ /api/kbs                │  │
+          │  │ /api/folders            │  │
+          │  │ /api/notes              │  │
+          │  │ /api/assets             │  │
+          │  └────────┬────────────────┘  │
+          │           │                   │
+          │  ┌────────┴────────────────┐  │
+          │  │       Services          │  │
+          │  │  configService          │  │
+          │  │  kbService              │  │
+          │  │  folderService          │  │
+          │  │  fileNoteService        │  │
+          │  │  imageService (Sharp)   │  │
+          │  └──────────┬──────────────┘  │
+          └─────────────┼─────────────────┘
                         │ File I/O
           ┌─────────────┼─────────────────┐
-          │     Local File System         │
+          │   KB Root Directory           │
+          │   (user-configured)           │
           │                               │
-          │  notes/                       │
-          │  ├── *.md          (notes)    │
-          │  ├── <category>/*.md          │
-          │  ├── .assets/images/          │
-          │  │   ├── <uuid>.webp          │
-          │  │   ├── <uuid>-thumb.webp    │
-          │  │   └── <uuid>.meta.json     │
-          │  ├── .sections.json           │
-          │  ├── .stickies.json           │
-          │  └── .counter                 │
+          │  <kb-root>/                   │
+          │  ├── ixda/                    │
+          │  │   ├── kb.yaml             │
+          │  │   ├── .mariposa.json      │
+          │  │   ├── data/               │
+          │  │   │   ├── .mariposa.json  │
+          │  │   │   ├── current.md      │
+          │  │   │   └── events/         │
+          │  │   └── knowledge/          │
+          │  ├── fagkomite/              │
+          │  │   ├── kb.yaml             │
+          │  │   └── ...                 │
+          │  └── ...                     │
+          │                               │
+          │  ~/.mariposa/config.json      │
           └───────────────────────────────┘
 ```
 
-## Data Entities
+## Data Model
 
-### Note
+### Knowledge Base (KB)
 
-Stored as Markdown files with YAML frontmatter. Uncategorized notes live in `notes/`, categorized notes in `notes/<category>/`.
+A KB is a directory containing a `kb.yaml` file. Mariposa discovers KBs by scanning the user-configured root directory for subdirectories with this file.
+
+**kb.yaml format** (Adjutant standard):
 
 ```yaml
----
-title: My Note Title
-tags:
-  - javascript
-  - react
-created: 2025-01-15T10:30:00.000Z
-modified: 2025-01-15T14:22:00.000Z
-position:
-  x: 320
-  y: 180
----
-
-# Heading
-
-Note content in **Markdown** format.
+name: "ixda"
+description: "IxDA Stavanger chapter operations..."
+model: "anthropic/claude-sonnet-4-6"
+access: "read-write"
+created: "2026-02-27"
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `slug` | string | Derived from filename (e.g., `note-1` from `note-1.md`) |
-| `title` | string | From frontmatter |
-| `content` | string | Markdown body after frontmatter |
-| `tags` | string[] | Optional tag list |
-| `category` | string | Directory name, or `null` for uncategorized |
-| `created` | ISO date | Creation timestamp |
-| `modified` | ISO date | Last modification timestamp |
-| `position` | `{x, y}` | Canvas position |
+| `name` | string | KB identifier (matches directory name) |
+| `description` | string | Human-readable description |
+| `model` | string | LLM model hint (not used by Mariposa) |
+| `access` | string | Access level hint (Mariposa supports read-write) |
+| `created` | string | Creation date |
+
+### Folder
+
+Every directory within a KB is a navigable folder on the canvas. Folders can contain `.md` files (notes), subfolders, and other files.
+
+### .mariposa.json (Canvas Sidecar)
+
+Each folder can have a `.mariposa.json` file storing canvas layout metadata. This is the only file Mariposa writes to KB directories.
+
+```json
+{
+  "items": {
+    "current.md": {
+      "position": { "x": 100, "y": 200 },
+      "tags": ["status", "active"]
+    },
+    "events": {
+      "position": { "x": 400, "y": 100 }
+    }
+  },
+  "sections": {
+    "section-1": {
+      "name": "Active Work",
+      "position": { "x": 50, "y": 50 },
+      "width": 500,
+      "height": 400,
+      "color": "blue",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  },
+  "stickies": {
+    "sticky-1": {
+      "text": "Remember to update",
+      "color": "yellow",
+      "position": { "x": 300, "y": 500 },
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  },
+  "nextSectionId": 2,
+  "nextStickyId": 1
+}
+```
+
+| Section | Description |
+|---------|-------------|
+| `items` | Per-file and per-subfolder canvas metadata (position, tags) |
+| `sections` | Grouping rectangles on the canvas for this folder |
+| `stickies` | Sticky notes on the canvas for this folder |
+| `nextSectionId` | Auto-increment counter for section IDs |
+| `nextStickyId` | Auto-increment counter for sticky IDs |
+
+### Note (File)
+
+Notes are `.md` files within KB directories. Users can create, edit, and delete notes. File content is the markdown body. Mariposa-specific metadata (position, tags, title override) is stored in the parent folder's `.mariposa.json`.
+
+**Title extraction priority**: First `# heading` in file > filename sans extension.
 
 ### Image
 
-Stored as WebP files in `notes/.assets/images/`. Each image has three files:
+Images found within KB directories are displayed on the canvas. Stored in `<kb>/.mariposa/assets/` for KB-scoped image management.
 
 | File | Purpose |
 |------|---------|
@@ -107,82 +166,63 @@ Stored as WebP files in `notes/.assets/images/`. Each image has three files:
 | `<uuid>-thumb.webp` | 300px-wide thumbnail (quality 75) |
 | `<uuid>.meta.json` | Category metadata sidecar |
 
-The `.meta.json` file contains:
-```json
-{
-  "category": "my-category"
-}
-```
-
-Canvas positions for images are stored client-side in localStorage under the `mariposa-image-positions` key.
-
-Accepted upload formats: JPEG, PNG, GIF, WebP, SVG, HEIC/HEIF. All are converted to WebP via Sharp.
-
 ### Section
 
-Stored in `notes/.sections.json` as a JSON array.
-
-```json
-{
-  "slug": "section-1",
-  "name": "Research",
-  "category": "my-project",
-  "position": { "x": 0, "y": 0 },
-  "size": { "width": 600, "height": 400 },
-  "color": "blue",
-  "created": "2025-01-15T10:30:00.000Z",
-  "modified": "2025-01-15T10:30:00.000Z"
-}
-```
+Grouping rectangles on the canvas. Stored in the folder's `.mariposa.json` under the `sections` key. No separate files.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `slug` | string | Auto-generated identifier |
 | `name` | string | Editable display label |
-| `category` | string | Which canvas space it belongs to |
 | `position` | `{x, y}` | Canvas position |
-| `size` | `{width, height}` | Rectangle dimensions |
+| `width` | number | Rectangle width |
+| `height` | number | Rectangle height |
 | `color` | string | Color variant name |
-| `created` | ISO date | Creation timestamp |
-| `modified` | ISO date | Last modification timestamp |
+| `createdAt` | ISO date | Creation timestamp |
+| `updatedAt` | ISO date | Last modification timestamp |
 
 ### Sticky
 
-Stored in `notes/.stickies.json` as a JSON array.
-
-```json
-{
-  "slug": "sticky-1",
-  "text": "Remember to check this",
-  "category": "my-project",
-  "color": "yellow",
-  "position": { "x": 500, "y": 300 },
-  "created": "2025-01-15T10:30:00.000Z",
-  "modified": "2025-01-15T10:30:00.000Z"
-}
-```
+Colored sticky notes on the canvas. Stored in the folder's `.mariposa.json` under the `stickies` key. No separate files.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `slug` | string | Auto-generated identifier |
 | `text` | string | Sticky content |
-| `category` | string | Which canvas space it belongs to |
 | `color` | string | One of 9 color variants |
 | `position` | `{x, y}` | Canvas position |
-| `created` | ISO date | Creation timestamp |
-| `modified` | ISO date | Last modification timestamp |
+| `createdAt` | ISO date | Creation timestamp |
+| `updatedAt` | ISO date | Last modification timestamp |
+
+## App Configuration
+
+Config persisted at `~/.mariposa/config.json`:
+
+```json
+{
+  "kbRoot": "/Volumes/Mandalor/JottaSync/AI_knowledge_bases"
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Port | 3020 | HTTP server port |
+| Host | `0.0.0.0` | Bind address |
+| `kbRoot` | none | User-configured path to parent directory containing KBs |
+
+The `kbRoot` is set via the web UI settings dialog and validated on save (directory must exist and contain at least one subdirectory with `kb.yaml`).
 
 ## Web Application
 
 ### Routing
 
-React Router manages three views:
+React Router manages views via wildcard paths:
 
 | Route | Component | Description |
 |-------|-----------|-------------|
-| `/` | `Home` | Search-first landing with animated background. Search queries the API and displays results grouped by category. Clicking a result navigates to the note's canvas and opens the editor. |
-| `/:category` | `Canvas` | Infinite canvas for a category space. Loads notes, images, sections, and stickies for that category. |
-| `/:category/:noteSlug` | `Canvas + Editor` | Same canvas view with the note editor overlay open. URL updates when opening/closing the editor. |
+| `/` | `Home` | KB browser — cards for each discovered KB showing name and description from `kb.yaml`. Search bar searches across all KBs. Prompts to set KB root if not configured. |
+| `/:kb` | `Canvas` | KB root folder canvas. Shows files and subfolders as nodes. |
+| `/:kb/*path` | `Canvas` | Subfolder canvas within a KB (e.g. `/ixda/data/events`). |
+
+Note opening: Double-click a note node opens the editor overlay. Note identified by `kb + path`. Optional `?note=path` query param for shareable links.
 
 ### State Architecture
 
@@ -190,49 +230,49 @@ All state lives in `App.tsx` and is managed through custom hooks:
 
 ```
 App.tsx
-├── useCanvas()          → currentSpace, focusedNote, navigation
-├── useNotes()           → notes[], CRUD, position saves
-├── useImages()          → images[], upload, positions (localStorage)
-├── useSections()        → sections[], CRUD, resize saves
-├── useStickies()        → stickies[], CRUD, color/text changes
-├── useSettings()        → theme, snapToObject, showSnapLines
+├── useCanvas()          → kb, folderPath, navigation between folders
+├── useKbs()             → discovered KBs list
+├── useFolder()          → folder entries, .mariposa.json, sections, stickies
+├── useNotes()           → read note content by kb+path
+├── useImages()          → images for current KB
+├── useSettings()        → theme, snap, kbRoot (server-side)
 ├── useCanvasHistory()   → undo/redo stack
 ├── useSnapToGuides()    → snap alignment lines
 ├── useCanvasNodeDrag()  → drag lifecycle
 ├── useCanvasClipboard() → copy/paste
 ├── useCanvasKeyboard()  → keyboard shortcuts
-├── useCanvasTouchGestures() → long-press, two-finger tap
-└── useCanvasContextMenu()   → right-click menus
+└── useCanvasTouchGestures() → long-press, two-finger tap
 ```
 
 Contexts provide cross-cutting state:
 
 | Context | Purpose |
 |---------|---------|
-| `EditorContext` | Controls editor overlay: animation origin rect, initial note data for opening |
-| `PlacementContext` | Controls placement mode: whether active, what type (note/section/sticky), ghost preview follows cursor |
-| `CategoryDialogContext` | Controls category dialog: mode (select/create/rename/delete), target category |
+| `EditorContext` | Controls editor overlay: animation origin rect, initial note data |
+| `PlacementContext` | Controls placement mode: active state, type (section/sticky), ghost preview |
 
 ### Canvas Implementation
 
-The canvas uses `@xyflow/react` (React Flow) with four custom node types registered in `web/src/components/nodes/index.ts`:
+The canvas uses `@xyflow/react` (React Flow) with custom node types:
 
-- **NoteNode**: Shows title + read-only TipTap preview of markdown content. Double-click opens the full editor overlay. Supports highlight animation when focused from sidebar.
-- **ImageNode**: Renders images with three states (uploading spinner, error icon, ready). Has a corner resize handle that maintains aspect ratio.
-- **SectionNode**: Renders a colored rectangle with an editable name label (click to edit inline). Has 4-corner resize handles that scale inversely with zoom level. Supports touch resize.
-- **StickyNode**: Renders a colored sticky note. Double-click (desktop) or single tap when selected (mobile) enters text editing mode. Cmd/Ctrl+Enter saves. 9 color variants available.
+- **NoteNode**: Shows title (extracted from `# heading` or filename) + TipTap preview of markdown content. Double-click opens the full editor overlay.
+- **FolderNode**: Shows folder name, icon, and file count. Double-click navigates into the folder. Draggable, position saved to parent's `.mariposa.json`.
+- **ImageNode**: Renders images with states (uploading, error, ready). Corner resize handle maintains aspect ratio.
+- **SectionNode**: Colored rectangle with editable name label. 4-corner resize handles.
+- **StickyNode**: Colored sticky note with inline text editing. 9 color variants.
 
 ### Interactions
 
-**Drag & Drop**: `useCanvasNodeDrag` manages the full lifecycle — auto-selects node on drag start, calculates snap guides during drag, persists positions on drag stop, and updates section membership when nodes are dragged in/out of sections.
+**Drag & Drop**: `useCanvasNodeDrag` manages the full lifecycle — auto-selects node on drag start, calculates snap guides during drag, persists positions on drag stop (to `.mariposa.json` via folder meta API).
 
-**Snap-to-Guides**: `useSnapToGuides` calculates alignment lines (vertical and horizontal) by comparing the dragged node's edges and center to all other visible nodes. Threshold is 8px. Visual guides rendered by `SnapGuides` component.
+**Snap-to-Guides**: `useSnapToGuides` calculates alignment lines by comparing the dragged node's edges and center to all other visible nodes. 8px threshold.
 
-**Undo/Redo**: `useCanvasHistory` maintains a stack of up to 50 operations (move, delete, create, resize). Supports batch operations for multi-node actions.
+**Undo/Redo**: `useCanvasHistory` maintains a stack of up to 50 operations.
 
-**Clipboard**: `useCanvasClipboard` copies node data to the system clipboard as JSON. Falls back to module-level in-memory storage if system clipboard is unavailable. Supports pasting image files directly onto the canvas.
+**Clipboard**: `useCanvasClipboard` copies node data to system clipboard as JSON with in-memory fallback.
 
 **Keyboard Shortcuts** (`useCanvasKeyboard`):
+
 | Key | Action |
 |-----|--------|
 | Cmd/Ctrl+Z | Undo |
@@ -243,81 +283,47 @@ The canvas uses `@xyflow/react` (React Flow) with four custom node types registe
 | Escape | Clear selection / exit placement mode |
 | S | Enter section placement mode |
 | T | Enter sticky placement mode |
-| Enter | Select nodes inside a selected section |
 
 **Touch Gestures** (`useCanvasTouchGestures`):
 - Long-press (500ms) opens context menu
 - Two-finger tap opens context menu
-- Pinch-to-zoom detection prevents false triggers
 
 ### Editor
 
-The editor is a full-screen overlay (`Editor` component) that slides in from the note's position on the canvas (animation origin tracked via `EditorContext`).
+The editor is a full-screen overlay that slides in from the note's canvas position. Inside, TipTap provides rich text editing with extensions for headings, lists, code blocks, highlighting, and images. Supports autosave (1.5s debounce), image paste/drop upload, title editing, tag management, and note deletion.
 
-Inside, `NoteEditor` wraps a TipTap editor instance with these extensions:
-- StarterKit (headings, lists, code blocks, etc.)
-- Markdown (bidirectional markdown serialization via `tiptap-markdown`)
-- Highlight (text highlighting)
-- Image (inline images)
-- Placeholder ("Start writing...")
+### Sidebar
 
-The editor includes:
-- Title input field
-- Tag input (`TagInput` component)
-- Category selector
-- Rich text editing area with toolbar
+Recursive folder tree showing the KB structure. Expandable folders show subfolders and notes. Click a folder to navigate to its canvas. Click a note to focus/open it.
 
 ## API Server
 
-### Configuration (`api/src/config.ts`)
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Port | 3020 | HTTP server port |
-| Host | `0.0.0.0` | Bind address |
-| Notes directory | `api/notes/` | Overridable via `--notes-dir` CLI arg |
-| Assets directory | `<notesDir>/.assets/images/` | Derived from notes dir |
-| Counter file | `.counter` | Auto-increment slug counter |
-| Default category | `all-notes` | Category for the main space |
-
 ### Service Layer
 
-Each service is a singleton class handling file I/O for its entity type:
+- **ConfigService** (`configService.ts`): Reads/writes `~/.mariposa/config.json`. Validates kbRoot path exists and contains KB directories.
+- **KbService** (`kbService.ts`): Scans kbRoot for directories containing `kb.yaml`. Parses KB metadata.
+- **FolderService** (`folderService.ts`): Lists folder contents (files + subfolders). Reads/writes `.mariposa.json` sidecar files. Manages sections and stickies within the sidecar.
+- **FileNoteService** (`fileNoteService.ts`): Reads `.md` files. Extracts titles from first `# heading`. Combines file content with `.mariposa.json` metadata. Provides search within a KB.
+- **ImageService** (`imageService.ts`): Manages images scoped to KBs. Stored in `<kb>/.mariposa/assets/`.
 
-- **NoteService** (`noteService.ts`): Reads/writes `.md` files with YAML frontmatter. Handles search (title/content substring match), category filtering, tag filtering. Manages file moves between category directories.
-- **ImageService** (`imageService.ts`): Uses Sharp to convert uploaded images to WebP (quality 80) and generate 300px thumbnails (quality 75). Manages `.meta.json` sidecar files for category metadata.
-- **SectionService** (`sectionService.ts`): Reads/writes `.sections.json`. Filters by category field.
-- **StickyService** (`stickyService.ts`): Reads/writes `.stickies.json`. Filters by category field.
+### Security
 
-### MCP Integration
-
-The MCP server (`api/src/mcp/server.ts`) exposes Mariposa's note system to AI assistants via the Model Context Protocol. It uses Streamable HTTP transport through the `/mcp` endpoint.
-
-**Available tools**: `list_notes`, `get_note`, `create_note`, `update_note`, `delete_note`, `list_categories`, `create_category`, `list_tags`
-
-**Available prompts**: `display_note`, `summarize_notes`, `create_note_helper`, `search_notes`
-
-The MCP route (`api/src/routes/mcp.ts`) handles three HTTP methods:
-- `POST /mcp` — JSON-RPC requests from clients
-- `GET /mcp` — SSE stream for server-initiated messages
-- `DELETE /mcp` — Session termination
+- Mariposa never modifies `kb.yaml` or other KB config files
+- Mariposa writes `.md` files (note create/edit), `.mariposa.json` sidecars (canvas metadata), and `.mariposa/assets/` (uploaded images)
+- Path traversal protection on all file operations (KB and path params validated)
 
 ## Development Setup
 
 ### Proxy Configuration
 
-The Vite dev server (`web/vite.config.ts`) proxies `/api` requests to the Express API:
+Vite dev server proxies `/api` to Express:
 
 ```
 Browser → localhost:3021 (Vite) → /api/* → localhost:3020 (Express)
 ```
 
-This avoids CORS issues during development. In production, both would typically be served from the same origin or configured with appropriate CORS headers.
-
 ### Build Optimization
 
-Vite's build config splits large dependencies into separate chunks:
-- `@xyflow/react` → `vendor-xyflow` chunk
-- TipTap packages → `vendor-tiptap` chunk
-
-This improves caching — vendor code changes rarely while application code changes frequently.
+Vite splits large dependencies into separate chunks:
+- `@xyflow/react` → vendor chunk
+- TipTap packages → vendor chunk

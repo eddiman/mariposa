@@ -1,137 +1,61 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import type { CategoryMeta } from '../types';
+import { useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 interface UseCanvasReturn {
-  currentSpace: string | null; // null = all spaces (uncategorized)
-  categories: CategoryMeta[];
-  loadingCategories: boolean;
-  setCurrentSpace: (space: string | null) => void;
-  focusedNoteSlug: string | null;
-  setFocusedNoteSlug: (slug: string | null, category?: string) => void;
-  createCategory: (slug: string, displayName: string) => Promise<CategoryMeta | null>;
-  updateCategory: (slug: string, displayName: string) => Promise<boolean>;
-  deleteCategory: (slug: string, moveNotesTo?: string) => Promise<{ success: boolean; movedNotes?: number }>;
-  refetchCategories: () => Promise<void>;
+  currentKb: string | null;
+  currentPath: string;
+  focusedNote: string | null;  // query param ?note=path/to/file.md
+  setCurrentKb: (kb: string | null) => void;
+  navigateToFolder: (kb: string, folderPath: string) => void;
+  setFocusedNote: (notePath: string | null) => void;
 }
 
 export function useCanvas(): UseCanvasReturn {
-  const { category, noteSlug } = useParams<{ category?: string; noteSlug?: string }>();
+  const { kb, '*': wildcardPath } = useParams<{ kb?: string; '*'?: string }>();
   const navigate = useNavigate();
-  
-  // Derive state from URL params
-  // If category is undefined, we're at "/" (all notes / uncategorized)
-  const currentSpace = category || null;
-  const focusedNoteSlug = noteSlug || null;
-  
-  const [categories, setCategories] = useState<CategoryMeta[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const location = useLocation();
 
-  const fetchCategories = useCallback(async () => {
-    try {
-      const res = await fetch('/api/categories/meta');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setCategories(data.categories || []);
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, []);
+  const currentKb = kb || null;
+  const currentPath = wildcardPath || '';
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  // Extract ?note= query param
+  const searchParams = new URLSearchParams(location.search);
+  const focusedNote = searchParams.get('note');
 
-  const setCurrentSpace = useCallback((space: string | null) => {
-    // Navigate to the new space, closing any open note
-    if (space === null) {
+  const setCurrentKb = useCallback((newKb: string | null) => {
+    if (newKb === null) {
       navigate('/');
     } else {
-      navigate(`/${space}`);
+      navigate(`/${newKb}`);
     }
   }, [navigate]);
 
-  const setFocusedNoteSlug = useCallback((slug: string | null, category?: string) => {
-    if (slug === null) {
-      // Close note - navigate back to category
-      if (currentSpace) {
-        navigate(`/${currentSpace}`);
-      } else {
-        navigate('/');
-      }
+  const navigateToFolder = useCallback((navKb: string, folderPath: string) => {
+    if (folderPath) {
+      navigate(`/${navKb}/${folderPath}`);
     } else {
-      // Open note - navigate to note URL using the note's category
-      const noteCategory = category || currentSpace || 'all-notes';
-      navigate(`/${noteCategory}/${slug}`);
+      navigate(`/${navKb}`);
     }
-  }, [navigate, currentSpace]);
+  }, [navigate]);
 
-  const createCategory = useCallback(async (slug: string, displayName: string): Promise<CategoryMeta | null> => {
-    try {
-      const res = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, displayName }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const newCategory = await res.json();
-      // Refetch to get updated list
-      await fetchCategories();
-      return newCategory;
-    } catch (err) {
-      console.error('Failed to create category:', err);
-      return null;
-    }
-  }, [fetchCategories]);
+  const setFocusedNote = useCallback((notePath: string | null) => {
+    const basePath = currentKb
+      ? (currentPath ? `/${currentKb}/${currentPath}` : `/${currentKb}`)
+      : '/';
 
-  const updateCategory = useCallback(async (slug: string, displayName: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/categories/${slug}/meta`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // Update local state
-      setCategories(prev => prev.map(c => 
-        c.name === slug ? { ...c, displayName } : c
-      ));
-      return true;
-    } catch (err) {
-      console.error('Failed to update category:', err);
-      return false;
+    if (notePath) {
+      navigate(`${basePath}?note=${encodeURIComponent(notePath)}`);
+    } else {
+      navigate(basePath);
     }
-  }, []);
-
-  const deleteCategory = useCallback(async (slug: string, moveNotesTo?: string): Promise<{ success: boolean; movedNotes?: number }> => {
-    try {
-      const params = moveNotesTo ? `?moveTo=${encodeURIComponent(moveNotesTo)}` : '';
-      const res = await fetch(`/api/categories/${slug}${params}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = await res.json();
-      // Refetch to get updated list
-      await fetchCategories();
-      return { success: true, movedNotes: result.movedNotes };
-    } catch (err) {
-      console.error('Failed to delete category:', err);
-      return { success: false };
-    }
-  }, [fetchCategories]);
+  }, [navigate, currentKb, currentPath]);
 
   return {
-    currentSpace,
-    categories,
-    loadingCategories,
-    setCurrentSpace,
-    focusedNoteSlug,
-    setFocusedNoteSlug,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    refetchCategories: fetchCategories,
+    currentKb,
+    currentPath,
+    focusedNote,
+    setCurrentKb,
+    navigateToFolder,
+    setFocusedNote,
   };
 }

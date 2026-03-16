@@ -1,330 +1,162 @@
-import { useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type { CanvasImage, Position } from '../types';
 
-// Use relative URLs - Vite proxy handles /api routes
-
-interface UseImagesOptions {
-  category?: string;
-}
-
-interface UseImagesReturn {
-  images: CanvasImage[];
-  loading: boolean;
-  error: string | null;
-  uploadImage: (file: File, position?: Position, category?: string) => void;
-  duplicateImage: (id: string, position: Position) => Promise<CanvasImage | null>;
-  updateImagePosition: (id: string, position: Position) => void;
-  updateImageSize: (id: string, displayWidth: number, displayHeight: number) => void;
-  deleteImage: (id: string) => Promise<boolean>;
-  moveToCategory: (id: string, category: string) => Promise<boolean>;
-  refetch: () => Promise<void>;
-}
-
-// Store image canvas positions in localStorage (images don't have frontmatter like notes)
-const POSITIONS_KEY = 'mariposa-image-positions';
-
-interface ImagePositions {
-  [id: string]: {
-    position?: Position;
-    displayWidth?: number;
-    displayHeight?: number;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
   };
 }
 
-function loadPositions(): ImagePositions {
+const POSITIONS_STORAGE_KEY = 'mariposa-image-positions';
+
+function loadPositions(): Record<string, { position: Position; displayWidth?: number; displayHeight?: number }> {
   try {
-    const stored = localStorage.getItem(POSITIONS_KEY);
+    const stored = localStorage.getItem(POSITIONS_STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
   } catch {
     return {};
   }
 }
 
-function savePositions(positions: ImagePositions): void {
-  try {
-    localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions));
-  } catch {
-    // Ignore storage errors
-  }
+function savePositions(positions: Record<string, { position: Position; displayWidth?: number; displayHeight?: number }>) {
+  localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(positions));
 }
 
-export function useImages(options: UseImagesOptions = {}): UseImagesReturn {
+interface UseImagesOptions {
+  kb: string | null;
+}
+
+interface UseImagesReturn {
+  images: CanvasImage[];
+  loading: boolean;
+  uploadImage: (file: File, position: Position) => Promise<CanvasImage | null>;
+  updateImagePosition: (id: string, position: Position) => void;
+  updateImageSize: (id: string, width: number, height: number) => void;
+  deleteImage: (id: string) => Promise<boolean>;
+}
+
+export function useImages(options: UseImagesOptions): UseImagesReturn {
+  const { kb } = options;
   const [images, setImages] = useState<CanvasImage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const positionsRef = useRef(loadPositions());
 
   const fetchImages = useCallback(async () => {
+    if (!kb) {
+      setImages([]);
+      return;
+    }
+
+    setLoading(true);
     try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (options.category) {
-        params.set('category', options.category);
-      }
-      const url = `/api/assets${params.toString() ? `?${params}` : ''}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch images');
-      
-      const data = await response.json();
-      const positions = loadPositions();
-      
-      // Merge API images with stored positions, mark as ready
-      const imagesWithPositions: CanvasImage[] = data.images.map((img: CanvasImage) => ({
-        ...img,
-        position: positions[img.id]?.position,
-        displayWidth: positions[img.id]?.displayWidth ?? Math.min(img.width, 400),
-        displayHeight: positions[img.id]?.displayHeight ?? Math.min(img.height, 400 * (img.height / img.width)),
-        status: 'ready' as const,
-      }));
-      
-      // Keep any uploading/error images that aren't in the fetched list
-      setImages(prev => {
-        const pendingImages = prev.filter(img => img.status === 'uploading' || img.status === 'error');
-        const fetchedIds = new Set(imagesWithPositions.map((img: CanvasImage) => img.id));
-        const uniquePending = pendingImages.filter(img => !fetchedIds.has(img.id));
-        return [...imagesWithPositions, ...uniquePending];
+      const res = await fetch(`/api/assets?kb=${encodeURIComponent(kb)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const fetchedImages: CanvasImage[] = (data.images || []).map((img: CanvasImage) => {
+        const stored = positionsRef.current[img.id];
+        return {
+          ...img,
+          position: stored?.position || { x: Math.random() * 400, y: Math.random() * 400 },
+          displayWidth: stored?.displayWidth,
+          displayHeight: stored?.displayHeight,
+          status: 'ready' as const,
+        };
       });
-      setError(null);
+      setImages(fetchedImages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load images');
+      console.error('Failed to fetch images:', err);
     } finally {
       setLoading(false);
     }
-  }, [options.category]);
+  }, [kb]);
 
   useEffect(() => {
     fetchImages();
   }, [fetchImages]);
 
-  const uploadImage = useCallback((file: File, position?: Position, category?: string): void => {
-    // Generate a temporary ID for the placeholder
-    const tempId = `temp-${uuidv4()}`;
-    const displayWidth = 200;
-    const displayHeight = 150;
-    
-    // Create placeholder image immediately
-    const placeholder: CanvasImage = {
+  const uploadImage = useCallback(async (file: File, position: Position): Promise<CanvasImage | null> => {
+    if (!kb) return null;
+
+    const tempId = `upload-${Date.now()}`;
+    const tempImage: CanvasImage = {
       id: tempId,
       webpUrl: '',
       thumbUrl: '',
-      width: displayWidth,
-      height: displayHeight,
-      aspectRatio: displayWidth / displayHeight,
-      category,
-      position: position ?? { x: 100, y: 100 },
-      displayWidth,
-      displayHeight,
+      width: 300,
+      height: 200,
+      aspectRatio: 1.5,
+      kb,
+      position,
       status: 'uploading',
     };
-    
-    // Add placeholder to state immediately
-    setImages(prev => [...prev, placeholder]);
-    
-    // Save position to localStorage
-    const positions = loadPositions();
-    positions[tempId] = {
-      position: placeholder.position,
-      displayWidth,
-      displayHeight,
-    };
-    savePositions(positions);
-    
-    // Start async upload
-    const formData = new FormData();
-    formData.append('image', file);
-    if (category) {
-      formData.append('category', category);
-    }
-    
-    fetch(`/api/assets/upload`, {
-      method: 'POST',
-      body: formData,
-    })
-      .then(async response => {
-        if (!response.ok) throw new Error('Failed to upload image');
-        
-        const newImage: CanvasImage = await response.json();
-        
-        // Set default display size (max 400px wide, preserve aspect ratio)
-        const finalDisplayWidth = Math.min(newImage.width, 400);
-        const finalDisplayHeight = finalDisplayWidth / newImage.aspectRatio;
-        
-        const imageWithPosition: CanvasImage = {
-          ...newImage,
-          position: placeholder.position,
-          displayWidth: finalDisplayWidth,
-          displayHeight: finalDisplayHeight,
-          status: 'ready',
-        };
-        
-        // Update localStorage with real ID
-        const updatedPositions = loadPositions();
-        delete updatedPositions[tempId];
-        updatedPositions[newImage.id] = {
-          position: imageWithPosition.position,
-          displayWidth: finalDisplayWidth,
-          displayHeight: finalDisplayHeight,
-        };
-        savePositions(updatedPositions);
-        
-        // Replace placeholder with real image
-        setImages(prev => prev.map(img => 
-          img.id === tempId ? imageWithPosition : img
-        ));
-      })
-      .catch(err => {
-        // Update placeholder to error state
-        setImages(prev => prev.map(img => 
-          img.id === tempId 
-            ? { 
-                ...img, 
-                status: 'error' as const, 
-                errorMessage: err instanceof Error ? err.message : 'Upload failed' 
-              } 
-            : img
-        ));
-      });
-  }, []);
+    setImages(prev => [...prev, tempImage]);
 
-  const duplicateImage = useCallback(async (id: string, position: Position): Promise<CanvasImage | null> => {
     try {
-      // Find the original image to copy category
-      const originalImage = images.find(img => img.id === id);
-      
-      const response = await fetch(`/api/assets/${id}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: originalImage?.category }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to duplicate image');
-      }
-      
-      const newImage: CanvasImage = await response.json();
-      
-      const displayWidth = originalImage?.displayWidth ?? Math.min(newImage.width, 400);
-      const displayHeight = originalImage?.displayHeight ?? displayWidth / newImage.aspectRatio;
-      
-      const imageWithPosition: CanvasImage = {
-        ...newImage,
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('kb', kb);
+
+      const res = await fetch('/api/assets/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const metadata = await res.json();
+
+      const newImage: CanvasImage = {
+        ...metadata,
         position,
-        displayWidth,
-        displayHeight,
         status: 'ready',
       };
-      
-      // Save position to localStorage
-      const positions = loadPositions();
-      positions[newImage.id] = {
-        position,
-        displayWidth,
-        displayHeight,
-      };
-      savePositions(positions);
-      
-      // Add to state
-      setImages(prev => [...prev, imageWithPosition]);
-      
-      return imageWithPosition;
+
+      positionsRef.current[metadata.id] = { position };
+      savePositions(positionsRef.current);
+
+      setImages(prev => prev.map(img => img.id === tempId ? newImage : img));
+      return newImage;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to duplicate image');
+      console.error('Failed to upload image:', err);
+      setImages(prev => prev.map(img =>
+        img.id === tempId ? { ...img, status: 'error', errorMessage: 'Upload failed' } : img,
+      ));
       return null;
     }
-  }, [images]);
+  }, [kb]);
+
+  const debouncedSavePositions = useRef(debounce(() => savePositions(positionsRef.current), 300));
 
   const updateImagePosition = useCallback((id: string, position: Position) => {
-    // Optimistic update
-    setImages(prev => prev.map(img => 
-      img.id === id ? { ...img, position } : img
-    ));
-    
-    // Persist to localStorage
-    const positions = loadPositions();
-    positions[id] = { ...positions[id], position };
-    savePositions(positions);
+    setImages(prev => prev.map(img => img.id === id ? { ...img, position } : img));
+    positionsRef.current[id] = { ...positionsRef.current[id], position };
+    debouncedSavePositions.current();
   }, []);
 
   const updateImageSize = useCallback((id: string, displayWidth: number, displayHeight: number) => {
-    // Optimistic update
-    setImages(prev => prev.map(img => 
-      img.id === id ? { ...img, displayWidth, displayHeight } : img
+    setImages(prev => prev.map(img =>
+      img.id === id ? { ...img, displayWidth, displayHeight } : img,
     ));
-    
-    // Persist to localStorage
-    const positions = loadPositions();
-    positions[id] = { ...positions[id], displayWidth, displayHeight };
-    savePositions(positions);
+    positionsRef.current[id] = { ...positionsRef.current[id], displayWidth, displayHeight };
+    debouncedSavePositions.current();
   }, []);
 
   const deleteImage = useCallback(async (id: string): Promise<boolean> => {
-    // Check if this is a temp/error image (not on server)
-    const image = images.find(img => img.id === id);
-    if (image?.id.startsWith('temp-')) {
-      // Just remove from local state
-      setImages(prev => prev.filter(img => img.id !== id));
-      const positions = loadPositions();
-      delete positions[id];
-      savePositions(positions);
-      return true;
-    }
-    
+    if (!kb) return false;
+
+    setImages(prev => prev.filter(img => img.id !== id));
+
     try {
-      const response = await fetch(`/api/assets/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok && response.status !== 204) {
-        throw new Error('Failed to delete image');
-      }
-      
-      // Remove from state
-      setImages(prev => prev.filter(img => img.id !== id));
-      
-      // Remove from localStorage
-      const positions = loadPositions();
-      delete positions[id];
-      savePositions(positions);
-      
+      const res = await fetch(`/api/assets/${id}?kb=${encodeURIComponent(kb)}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+
+      delete positionsRef.current[id];
+      savePositions(positionsRef.current);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete image');
+      console.error('Failed to delete image:', err);
+      await fetchImages();
       return false;
     }
-  }, [images]);
+  }, [kb, fetchImages]);
 
-  const moveToCategory = useCallback(async (id: string, category: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/assets/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to move image');
-      }
-      
-      // Remove from current view since category changed
-      setImages(prev => prev.filter(img => img.id !== id));
-      
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to move image');
-      return false;
-    }
-  }, []);
-
-  return {
-    images,
-    loading,
-    error,
-    uploadImage,
-    duplicateImage,
-    updateImagePosition,
-    updateImageSize,
-    deleteImage,
-    moveToCategory,
-    refetch: fetchImages,
-  };
+  return { images, loading, uploadImage, updateImagePosition, updateImageSize, deleteImage };
 }

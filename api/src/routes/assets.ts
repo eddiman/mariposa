@@ -5,12 +5,9 @@ import type { ImageMetadata } from '../services/imageService.js';
 
 const router = Router();
 
-// Configure multer for memory storage (we'll process with sharp)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/heic', 'image/heif'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -21,7 +18,7 @@ const upload = multer({
   },
 });
 
-// POST /api/assets/upload - Upload an image
+// POST /api/assets/upload — Upload an image (requires kb in body)
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -29,23 +26,26 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       return;
     }
 
-    const category = req.body.category as string | undefined;
+    const kb = req.body.kb as string;
+    if (!kb) {
+      res.status(400).json({ error: 'Missing required field: kb' });
+      return;
+    }
 
-    const processed = await imageService.processAndSave(
-      req.file.buffer,
-      req.file.originalname,
-      category
-    );
+    const processed = await imageService.processAndSave(req.file.buffer, req.file.originalname, kb);
+    if (!processed) {
+      res.status(404).json({ error: 'Knowledge base not found' });
+      return;
+    }
 
-    const urls = imageService.getUrls(processed.id);
-
+    const urls = imageService.getUrls(processed.id, kb);
     const metadata: ImageMetadata = {
       id: processed.id,
       ...urls,
       width: processed.width,
       height: processed.height,
       aspectRatio: processed.width / processed.height,
-      category: processed.category,
+      kb,
     };
 
     res.status(201).json(metadata);
@@ -55,11 +55,16 @@ router.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// GET /api/assets - List all images (optionally filter by category)
+// GET /api/assets?kb=:kb — List images for a KB
 router.get('/', async (req, res) => {
   try {
-    const category = req.query.category as string | undefined;
-    const images = await imageService.list(category);
+    const kb = req.query.kb as string;
+    if (!kb) {
+      res.status(400).json({ error: 'Missing required query parameter: kb' });
+      return;
+    }
+
+    const images = await imageService.list(kb);
     res.json({ images, total: images.length });
   } catch (error) {
     console.error('List error:', error);
@@ -67,18 +72,23 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/assets/:filename - Get an image file
+// GET /api/assets/:filename?kb=:kb — Serve an image file
 router.get('/:filename', async (req, res) => {
   try {
-    const result = await imageService.get(req.params.filename);
-    
+    const kb = req.query.kb as string;
+    if (!kb) {
+      res.status(400).json({ error: 'Missing required query parameter: kb' });
+      return;
+    }
+
+    const result = await imageService.get(req.params.filename, kb);
     if (!result) {
       res.status(404).json({ error: 'Image not found' });
       return;
     }
 
     res.set('Content-Type', result.contentType);
-    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    res.set('Cache-Control', 'public, max-age=31536000');
     res.send(result.buffer);
   } catch (error) {
     console.error('Get error:', error);
@@ -86,64 +96,16 @@ router.get('/:filename', async (req, res) => {
   }
 });
 
-// POST /api/assets/:id/duplicate - Duplicate an image
-router.post('/:id/duplicate', async (req, res) => {
-  try {
-    const category = req.body.category as string | undefined;
-    const processed = await imageService.duplicate(req.params.id, category);
-    
-    if (!processed) {
-      res.status(404).json({ error: 'Image not found' });
-      return;
-    }
-
-    const urls = imageService.getUrls(processed.id);
-
-    const metadata: ImageMetadata = {
-      id: processed.id,
-      ...urls,
-      width: processed.width,
-      height: processed.height,
-      aspectRatio: processed.width / processed.height,
-      category: processed.category,
-    };
-
-    res.status(201).json(metadata);
-  } catch (error) {
-    console.error('Duplicate error:', error);
-    res.status(500).json({ error: 'Failed to duplicate image' });
-  }
-});
-
-// PATCH /api/assets/:id - Update image metadata (category)
-router.patch('/:id', async (req, res) => {
-  try {
-    const category = req.body.category as string | null | undefined;
-    
-    if (category === undefined) {
-      res.status(400).json({ error: 'No update data provided' });
-      return;
-    }
-
-    const success = await imageService.updateCategory(req.params.id, category);
-    
-    if (!success) {
-      res.status(404).json({ error: 'Image not found' });
-      return;
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Update error:', error);
-    res.status(500).json({ error: 'Failed to update image' });
-  }
-});
-
-// DELETE /api/assets/:id - Delete an image and all its variants
+// DELETE /api/assets/:id?kb=:kb — Delete an image
 router.delete('/:id', async (req, res) => {
   try {
-    const success = await imageService.delete(req.params.id);
-    
+    const kb = req.query.kb as string;
+    if (!kb) {
+      res.status(400).json({ error: 'Missing required query parameter: kb' });
+      return;
+    }
+
+    const success = await imageService.delete(req.params.id, kb);
     if (!success) {
       res.status(404).json({ error: 'Image not found' });
       return;

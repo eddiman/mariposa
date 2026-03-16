@@ -1,69 +1,147 @@
 // Shared TypeScript interfaces for the web app
 
-// Canvas tool modes for touch interaction
+// === Canvas tool modes ===
+
 export type CanvasTool = 'pan' | 'select';
+
+// === Position ===
 
 export interface Position {
   x: number;
   y: number;
 }
 
-export interface Note {
-  slug: string;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  position?: Position;
-  section?: string; // Section slug (e.g., "section-1")
-  createdAt: string;
-  updatedAt: string;
+// === App Config ===
+
+export interface AppConfig {
+  kbRoot?: string;
 }
 
-export interface NoteMeta {
-  slug: string;
-  title: string;
-  category: string;
-  tags: string[];
-  position?: Position;
-  section?: string; // Section slug (e.g., "section-1")
-  createdAt: string;
-  updatedAt: string;
+// === Knowledge Base ===
+
+export interface KbMeta {
+  name: string;
+  description: string;
+  path: string;
+  access: 'read-only' | 'read-write';
+  created?: string;
 }
 
-export interface NotesResponse {
-  notes: Note[];
+export interface KbsResponse {
+  kbs: KbMeta[];
   total: number;
 }
 
-export interface NoteCreateInput {
-  title: string;
-  content?: string;
-  category?: string;
-  tags?: string[];
-  position?: Position;
-  section?: string; // Section slug (e.g., "section-1")
-}
+// === Folder ===
 
-export interface NoteUpdateInput {
-  title?: string;
-  content?: string;
-  category?: string;
-  tags?: string[];
-  position?: Position;
-  section?: string | null; // null to clear section
-}
-
-export interface CategoryMeta {
+export interface FolderEntry {
   name: string;
-  displayName: string;
-  noteCount: number;
-  position?: Position;
+  type: 'file' | 'folder';
+  size?: number;
+  mtime?: string;
 }
 
-export interface CategoriesMetaResponse {
-  categories: CategoryMeta[];
+export interface ItemMeta {
+  position?: Position;
+  tags?: string[];
+  title?: string;
+  section?: string;
 }
+
+export interface MariposaSidecar {
+  items: Record<string, ItemMeta>;
+  sections: Record<string, SectionData>;
+  stickies: Record<string, StickyData>;
+  nextSectionId: number;
+  nextStickyId: number;
+}
+
+export interface FolderListing {
+  kb: string;
+  path: string;
+  entries: FolderEntry[];
+  meta: MariposaSidecar;
+}
+
+// === Note (read-only .md file) ===
+
+export interface NoteFile {
+  filename: string;
+  path: string;
+  kb: string;
+  content: string;
+  title: string;
+  tags: string[];
+  position?: Position;
+  section?: string;
+  size: number;
+  mtime: string;
+}
+
+export interface NoteMeta {
+  filename: string;
+  path: string;
+  kb: string;
+  title: string;
+  tags: string[];
+  position?: Position;
+  section?: string;
+  size: number;
+  mtime: string;
+}
+
+export interface NotesSearchResponse {
+  notes: NoteMeta[];
+  total: number;
+}
+
+// === Section (stored in .mariposa.json) ===
+
+export interface SectionData {
+  name: string;
+  position?: Position;
+  width: number;
+  height: number;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// For use with canvas nodes (has an ID)
+export interface Section {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  color?: string;
+  position?: Position;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// === Sticky (stored in .mariposa.json) ===
+
+export type StickyColor = 'white' | 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'mint' | 'peach';
+
+export interface StickyData {
+  text: string;
+  color: StickyColor;
+  position?: Position;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// For use with canvas nodes (has an ID)
+export interface Sticky {
+  id: string;
+  text: string;
+  color: StickyColor;
+  position?: Position;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// === Image ===
 
 export interface CanvasImage {
   id: string;
@@ -72,11 +150,10 @@ export interface CanvasImage {
   width: number;
   height: number;
   aspectRatio: number;
-  category?: string;
+  kb: string;
   position?: Position;
-  displayWidth?: number;  // Canvas display size
+  displayWidth?: number;
   displayHeight?: number;
-  // Upload state
   status?: 'uploading' | 'ready' | 'error';
   errorMessage?: string;
 }
@@ -86,71 +163,13 @@ export interface ImagesResponse {
   total: number;
 }
 
-// Section types
-export interface Section {
-  slug: string;
-  name: string;
-  width: number;
-  height: number;
-  color?: string;
-  position?: Position;
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-}
+// === Settings ===
 
-export interface SectionCreateInput {
-  name?: string;
-  width?: number;
-  height?: number;
-  color?: string;
-  position?: Position;
-  category?: string;
-  noteSlugs?: string[]; // Notes to include in this section
-}
+export type Theme = 'default' | 'bauhaus';
 
-export interface SectionUpdateInput {
-  name?: string;
-  width?: number;
-  height?: number;
-  color?: string;
-  position?: Position;
-  category?: string;
-}
-
-export interface SectionsResponse {
-  sections: Section[];
-  total: number;
-}
-
-// Sticky note types
-export type StickyColor = 'white' | 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'mint' | 'peach';
-
-export interface Sticky {
-  slug: string;
-  text: string;
-  color: StickyColor;
-  position?: Position;
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface StickyCreateInput {
-  text?: string;
-  color?: StickyColor;
-  position?: Position;
-  category?: string;
-}
-
-export interface StickyUpdateInput {
-  text?: string;
-  color?: StickyColor;
-  position?: Position;
-  category?: string;
-}
-
-export interface StickiesResponse {
-  stickies: Sticky[];
-  total: number;
+export interface Settings {
+  theme: Theme;
+  snapToObject: boolean;
+  showSnapLines: boolean;
+  kbRoot?: string;
 }
