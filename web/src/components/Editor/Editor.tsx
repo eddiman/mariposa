@@ -14,18 +14,23 @@ import styles from './Editor.module.css';
 // Plugin key for image paste handling
 const imagePastePluginKey = new PluginKey('imagePaste');
 
+// Module-level KB tracker — the ProseMirror plugin reads this when uploading images
+let currentEditorKb: string | undefined;
+
 interface EditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  kb?: string;
 }
 
 // Upload an image file and return the URL
-async function uploadImage(file: File): Promise<string | null> {
+async function uploadImage(file: File, kb?: string): Promise<string | null> {
   try {
     const formData = new FormData();
     formData.append('image', file);
+    if (kb) formData.append('kb', kb);
 
     const response = await fetch(`/api/assets/upload`, {
       method: 'POST',
@@ -65,7 +70,7 @@ const ImagePasteExtension = Extension.create({
                 const file = item.getAsFile();
                 if (file) {
                   // Upload the image and insert it
-                  uploadImage(file).then(url => {
+                  uploadImage(file, currentEditorKb).then(url => {
                     if (url) {
                       const { state, dispatch } = view;
                       const node = state.schema.nodes.image.create({ src: url });
@@ -87,7 +92,7 @@ const ImagePasteExtension = Extension.create({
               if (file.type.startsWith('image/')) {
                 event.preventDefault();
                 // Upload the image and insert it at drop position
-                uploadImage(file).then(url => {
+                uploadImage(file, currentEditorKb).then(url => {
                   if (url) {
                     const coordinates = view.posAtCoords({
                       left: event.clientX,
@@ -112,7 +117,10 @@ const ImagePasteExtension = Extension.create({
   },
 });
 
-export function Editor({ content, onChange, placeholder = 'Start writing...', autoFocus = false }: EditorProps) {
+export function Editor({ content, onChange, placeholder = 'Start writing...', autoFocus = false, kb }: EditorProps) {
+  // Update module-level KB for the ProseMirror image paste plugin
+  currentEditorKb = kb;
+
   // Track internal content to avoid re-setting from prop when we just made the change
   const lastContentRef = useRef<string>(content);
   // Track if we've completed initial mount to avoid state updates during render
@@ -213,7 +221,7 @@ export function Editor({ content, onChange, placeholder = 'Start writing...', au
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file && editor) {
-        const url = await uploadImage(file);
+        const url = await uploadImage(file, kb);
         if (url) {
           editor.chain().focus().setImage({ src: url }).run();
         }

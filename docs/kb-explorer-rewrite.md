@@ -234,12 +234,14 @@ Note opening: Editor overlay triggered by double-click. Note identified by `kb +
 | 7 | Wire up all new API routes in `index.ts` + route tests (19 tests) | Done |
 | 8 | Frontend types | Done |
 | 9 | Frontend hooks (`useKbs`, `useFolder`, rewrite `useCanvas`, `useNotes`, `useSettings`, `useImages`) | Done |
-| 10 | Frontend routing (`App.tsx`, wildcard routes) | Pending |
-| 11 | Home page — KB browser | Pending |
-| 12 | Sidebar — recursive folder tree | Pending |
-| 13 | Canvas + FolderNode + NoteNode updates | Pending |
-| 14 | Settings dialog — KB root config | Pending |
-| 15 | Cleanup dead code + final testing | Pending |
+| 10 | Frontend routing (`App.tsx`, wildcard routes) | Done |
+| 11 | Home page — KB browser with cards + search | Done |
+| 12 | Sidebar — recursive folder tree with breadcrumbs | Done |
+| 13 | Canvas + NoteNode updates (slug -> id/filename) | Done |
+| 14 | Settings dialog — KB root config + validation | Done |
+| 15 | NoteEditor — kb+path model with autosave/delete/tags | Done |
+| 16 | Editor — KB-scoped image upload (paste/drop/button) | Done |
+| 17 | Full web build verification | Done |
 
 ### Test Summary
 

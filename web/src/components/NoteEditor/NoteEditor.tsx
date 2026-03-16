@@ -286,6 +286,7 @@ export function NoteEditor({ kb, notePath, originRect, initialNote, sidebarOpen,
             content={content}
             onChange={handleContentChange}
             autoFocus
+            kb={kb}
           />
         </div>
       </div>
