@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { fileNoteService } from '../services/fileNoteService.js';
+import { searchService } from '../services/searchService.js';
 import { NoteCreateSchema, NoteUpdateSchema } from '../types/note.js';
 
 const router = Router();
@@ -17,7 +18,7 @@ router.get('/search', async (req: Request, res: Response) => {
       return;
     }
 
-    const results = await fileNoteService.search(kb, query);
+    const results = await searchService.search(kb, query);
     res.json({ notes: results, total: results.length });
   } catch (error) {
     res.status(500).json({ error: 'Failed to search notes' });
@@ -56,6 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Failed to create note — KB or folder not found' });
       return;
     }
+    searchService.invalidate(input.kb);
     res.status(201).json(note);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -85,6 +87,7 @@ router.put('/', async (req: Request, res: Response) => {
       return;
     }
 
+    searchService.invalidate(kb);
     res.json(note);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -113,6 +116,7 @@ router.delete('/', async (req: Request, res: Response) => {
       return;
     }
 
+    searchService.invalidate(kb);
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete note' });

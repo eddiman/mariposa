@@ -55,4 +55,86 @@ router.get('/status', async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/adjutant/kb/query — Query a KB via Adjutant's sub-agent.
+ *
+ * This is a pass-through to `adjutant kb query <name> "<question>"`.
+ * Only available when Adjutant integration is active and the adjutant
+ * CLI is on PATH.
+ *
+ * Body: { kb: string, question: string }
+ * Returns: { answer: string, source: string }
+ */
+router.post('/kb/query', async (req: Request, res: Response) => {
+  try {
+    const { kb: kbName, question } = req.body;
+
+    if (!kbName || !question) {
+      res.status(400).json({ error: 'Missing required fields: kb, question' });
+      return;
+    }
+
+    const adjDir = await registryService.resolveAdjutantDir();
+    if (!adjDir) {
+      res.status(503).json({ error: 'Adjutant integration not available' });
+      return;
+    }
+
+    // Verify the KB exists
+    const kb = await kbService.get(kbName);
+    if (!kb) {
+      res.status(404).json({ error: `Knowledge base "${kbName}" not found` });
+      return;
+    }
+
+    // Shell out to adjutant CLI
+    const { spawn } = await import('child_process');
+    const adjutantBin = path.join(adjDir, 'adjutant');
+
+    // Check if the adjutant CLI exists
+    try {
+      await fs.access(adjutantBin);
+    } catch {
+      res.status(503).json({ error: 'Adjutant CLI not found. Is Adjutant installed?' });
+      return;
+    }
+
+    const proc = spawn(adjutantBin, ['kb', 'query', kbName, question], {
+      cwd: adjDir,
+      env: { ...process.env, ADJ_DIR: adjDir },
+      timeout: 60_000,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+    proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    proc.on('error', (error) => {
+      console.error('KB query process error:', error);
+      res.status(500).json({ error: 'Failed to execute KB query' });
+    });
+
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        res.json({
+          answer: stdout.trim(),
+          kb: kbName,
+          question,
+        });
+      } else {
+        console.error('KB query failed:', stderr);
+        res.status(500).json({
+          error: 'KB query failed',
+          details: stderr.trim() || `Process exited with code ${code}`,
+        });
+      }
+    });
+  } catch (error) {
+    console.error('KB query error:', error);
+    res.status(500).json({ error: 'Failed to query knowledge base' });
+  }
+});
+
 export default router;
