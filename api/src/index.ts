@@ -13,20 +13,26 @@ export function createApp() {
   // Middleware
   app.use(express.json());
 
-  // CORS middleware
-  const allowedOrigins = [
-    'http://localhost:3021',
-    'https://localhost:3021',
-  ];
-
+  // CORS middleware — allow localhost and Tailscale origins
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Credentials', 'true');
+
+    if (origin) {
+      try {
+        const url = new URL(origin);
+        const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+        const isTailscale = url.hostname.endsWith('.ts.net') || /^100\./.test(url.hostname);
+        const isPrivate = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(url.hostname);
+
+        if (isLocalhost || isTailscale || isPrivate) {
+          res.header('Access-Control-Allow-Origin', origin);
+          res.header('Access-Control-Allow-Credentials', 'true');
+        }
+      } catch {
+        // Malformed origin, skip
+      }
     }
-    
+
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
 

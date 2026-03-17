@@ -102,15 +102,27 @@ router.post('/reveal', async (req: Request, res: Response) => {
       return;
     }
 
-    const proc = spawn(command, args, { timeout: 5000 });
+    let responded = false;
+    const proc = spawn(command, args);
+
+    // Kill the process after 5 seconds if it hasn't exited
+    const killTimer = setTimeout(() => {
+      proc.kill();
+    }, 5000);
 
     proc.on('error', (error) => {
+      clearTimeout(killTimer);
+      if (responded) return;
+      responded = true;
       console.error('Failed to open in file manager:', error);
       res.status(500).json({ error: 'Failed to open in file manager' });
     });
 
     proc.on('exit', (code) => {
-      if (code === 0) {
+      clearTimeout(killTimer);
+      if (responded) return;
+      responded = true;
+      if (code === 0 || code === null) {
         res.json({ success: true });
       } else {
         res.status(500).json({ error: 'Failed to open in file manager' });

@@ -84,8 +84,7 @@ class FolderService {
       items: { ...existing.items, ...update.items },
       sections: update.sections !== undefined ? { ...existing.sections, ...update.sections } : existing.sections,
       stickies: update.stickies !== undefined ? { ...existing.stickies, ...update.stickies } : existing.stickies,
-      nextSectionId: update.nextSectionId ?? existing.nextSectionId,
-      nextStickyId: update.nextStickyId ?? existing.nextStickyId,
+      images: update.images !== undefined ? { ...existing.images, ...update.images } : existing.images,
     };
 
     await this.writeSidecar(absPath, merged);

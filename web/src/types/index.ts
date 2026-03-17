@@ -48,12 +48,19 @@ export interface ItemMeta {
   section?: string;
 }
 
+export interface ImageMeta {
+  position?: Position;
+  width?: number;
+  height?: number;
+}
+
 export interface MariposaSidecar {
   items: Record<string, ItemMeta>;
   sections: Record<string, SectionData>;
   stickies: Record<string, StickyData>;
-  nextSectionId: number;
-  nextStickyId: number;
+  images: Record<string, ImageMeta>;
+  nextSectionId?: number; // Deprecated
+  nextStickyId?: number;  // Deprecated
 }
 
 export interface FolderListing {

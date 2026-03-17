@@ -146,15 +146,22 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
   }, [debouncedUpdatePosition]);
 
   const updateImageSize = useCallback((id: string, displayWidth: number, displayHeight: number) => {
-    setImages(prev => prev.map(img =>
-      img.id === id ? { ...img, displayWidth, displayHeight } : img,
-    ));
+    setImages(prev => {
+      const img = prev.find(i => i.id === id);
+      if (img) {
+        // Use position from state if not in cache
+        if (!imageMetaCache.current[id]?.position) {
+          imageMetaCache.current[id] = { ...imageMetaCache.current[id], position: img.position };
+        }
+      }
+      return prev.map(i => i.id === id ? { ...i, displayWidth, displayHeight } : i);
+    });
     imageMetaCache.current[id] = { ...imageMetaCache.current[id], width: displayWidth, height: displayHeight };
-    const position = imageMetaCache.current[id]?.position || images.find(img => img.id === id)?.position;
+    const position = imageMetaCache.current[id]?.position;
     if (position) {
       debouncedUpdatePosition(id, position, displayWidth, displayHeight);
     }
-  }, [debouncedUpdatePosition, images]);
+  }, [debouncedUpdatePosition]);
 
   const deleteImage = useCallback(async (id: string): Promise<boolean> => {
     if (!kb) return false;

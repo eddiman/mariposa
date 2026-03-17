@@ -170,7 +170,6 @@ export function useFolder(options: UseFolderOptions): UseFolderReturn {
         return {
           ...prev,
           sections: { ...prev.sections, [data.id]: data.section },
-          nextSectionId: prev.nextSectionId + 1,
         };
       });
 
@@ -245,7 +244,6 @@ export function useFolder(options: UseFolderOptions): UseFolderReturn {
         return {
           ...prev,
           stickies: { ...prev.stickies, [data.id]: data.sticky },
-          nextStickyId: prev.nextStickyId + 1,
         };
       });
 
