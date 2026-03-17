@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { kbService } from './kbService.js';
 import { MariposaSidecarSchema } from '../types/folder.js';
 import type { MariposaSidecar, FolderEntry, FolderListing } from '../types/folder.js';
@@ -113,7 +114,7 @@ class FolderService {
     if (!absPath) return null;
 
     const meta = await this.readSidecar(absPath);
-    const id = `section-${meta.nextSectionId}`;
+    const id = `section-${uuidv4()}`;
     const now = new Date().toISOString();
 
     const section: import('../types/folder.js').SectionData = {
@@ -127,7 +128,6 @@ class FolderService {
     };
 
     meta.sections[id] = section;
-    meta.nextSectionId++;
 
     await this.writeSidecar(absPath, meta);
     return { id, section };
@@ -160,7 +160,7 @@ class FolderService {
     if (!absPath) return null;
 
     const meta = await this.readSidecar(absPath);
-    const id = `sticky-${meta.nextStickyId}`;
+    const id = `sticky-${uuidv4()}`;
     const now = new Date().toISOString();
 
     const sticky: import('../types/folder.js').StickyData = {
@@ -172,7 +172,6 @@ class FolderService {
     };
 
     meta.stickies[id] = sticky;
-    meta.nextStickyId++;
 
     await this.writeSidecar(absPath, meta);
     return { id, sticky };
@@ -186,6 +185,44 @@ class FolderService {
     if (!meta.stickies[stickyId]) return false;
 
     delete meta.stickies[stickyId];
+    await this.writeSidecar(absPath, meta);
+    return true;
+  }
+
+  // === Image helpers ===
+
+  async updateImagePosition(kb: string, folderPath: string, imageId: string, position: import('../types/folder.js').Position, width?: number, height?: number): Promise<boolean> {
+    const absPath = await this.resolveFolder(kb, folderPath);
+    if (!absPath) return false;
+
+    const meta = await this.readSidecar(absPath);
+    if (!meta.images) meta.images = {};
+    if (!meta.images[imageId]) meta.images[imageId] = {};
+    
+    meta.images[imageId].position = position;
+    if (width !== undefined) meta.images[imageId].width = width;
+    if (height !== undefined) meta.images[imageId].height = height;
+
+    await this.writeSidecar(absPath, meta);
+    return true;
+  }
+
+  async getImagePosition(kb: string, folderPath: string, imageId: string): Promise<import('../types/folder.js').ImageMeta | null> {
+    const absPath = await this.resolveFolder(kb, folderPath);
+    if (!absPath) return null;
+
+    const meta = await this.readSidecar(absPath);
+    return meta.images?.[imageId] || null;
+  }
+
+  async deleteImagePosition(kb: string, folderPath: string, imageId: string): Promise<boolean> {
+    const absPath = await this.resolveFolder(kb, folderPath);
+    if (!absPath) return false;
+
+    const meta = await this.readSidecar(absPath);
+    if (!meta.images || !meta.images[imageId]) return false;
+
+    delete meta.images[imageId];
     await this.writeSidecar(absPath, meta);
     return true;
   }

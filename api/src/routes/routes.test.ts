@@ -142,20 +142,22 @@ describe('Folder routes', () => {
       .send({ name: 'My Section', color: 'blue' });
 
     expect(res.status).toBe(201);
-    expect(res.body.id).toBe('section-1');
+    expect(res.body.id).toMatch(/^section-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(res.body.section.name).toBe('My Section');
   });
 
   it('DELETE /api/folders/sections deletes a section', async () => {
     // Create first
-    await request(app)
+    const createRes = await request(app)
       .post('/api/folders/sections')
       .query({ kb: 'test-kb' })
       .send({ name: 'Delete Me' });
+    
+    const sectionId = createRes.body.id;
 
     const res = await request(app)
       .delete('/api/folders/sections')
-      .query({ kb: 'test-kb', id: 'section-1' });
+      .query({ kb: 'test-kb', id: sectionId });
 
     expect(res.status).toBe(204);
   });
@@ -167,7 +169,7 @@ describe('Folder routes', () => {
       .send({ text: 'Remember this', color: 'pink' });
 
     expect(res.status).toBe(201);
-    expect(res.body.id).toBe('sticky-1');
+    expect(res.body.id).toMatch(/^sticky-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(res.body.sticky.text).toBe('Remember this');
   });
 });

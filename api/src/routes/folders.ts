@@ -166,4 +166,83 @@ router.delete('/stickies', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/folders/images?kb=:kb&path=:path&id=:id — Update image position
+router.put('/images', async (req: Request, res: Response) => {
+  try {
+    const kb = req.query.kb as string;
+    const folderPath = (req.query.path as string) || '';
+    const imageId = req.query.id as string;
+
+    if (!kb || !imageId) {
+      res.status(400).json({ error: 'Missing required query parameters: kb, id' });
+      return;
+    }
+
+    const { position, width, height } = req.body;
+
+    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+      res.status(400).json({ error: 'Invalid position data' });
+      return;
+    }
+
+    const updated = await folderService.updateImagePosition(kb, folderPath, imageId, position, width, height);
+    if (!updated) {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update image position' });
+  }
+});
+
+// GET /api/folders/images?kb=:kb&path=:path&id=:id — Get image position
+router.get('/images', async (req: Request, res: Response) => {
+  try {
+    const kb = req.query.kb as string;
+    const folderPath = (req.query.path as string) || '';
+    const imageId = req.query.id as string;
+
+    if (!kb || !imageId) {
+      res.status(400).json({ error: 'Missing required query parameters: kb, id' });
+      return;
+    }
+
+    const imageMeta = await folderService.getImagePosition(kb, folderPath, imageId);
+    if (!imageMeta) {
+      res.status(404).json({ error: 'Image position not found' });
+      return;
+    }
+
+    res.json(imageMeta);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get image position' });
+  }
+});
+
+// DELETE /api/folders/images?kb=:kb&path=:path&id=:id — Delete image position
+router.delete('/images', async (req: Request, res: Response) => {
+  try {
+    const kb = req.query.kb as string;
+    const folderPath = (req.query.path as string) || '';
+    const imageId = req.query.id as string;
+
+    if (!kb || !imageId) {
+      res.status(400).json({ error: 'Missing required query parameters: kb, id' });
+      return;
+    }
+
+    const deleted = await folderService.deleteImagePosition(kb, folderPath, imageId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Image position not found' });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete image position' });
+  }
+});
+
 export default router;

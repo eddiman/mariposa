@@ -76,22 +76,38 @@ export interface StickyData {
   updatedAt: string;
 }
 
+// === Image metadata (stored in .mariposa.json) ===
+
+export const ImageMetaSchema = z.object({
+  position: PositionSchema.optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+
+export interface ImageMeta {
+  position?: Position;
+  width?: number;
+  height?: number;
+}
+
 // === .mariposa.json root schema ===
 
 export const MariposaSidecarSchema = z.object({
   items: z.record(z.string(), ItemMetaSchema).default({}),
   sections: z.record(z.string(), SectionSchema).default({}),
   stickies: z.record(z.string(), StickySchema).default({}),
-  nextSectionId: z.number().default(1),
-  nextStickyId: z.number().default(1),
+  images: z.record(z.string(), ImageMetaSchema).default({}),
+  nextSectionId: z.number().optional(), // Deprecated - kept for backward compatibility
+  nextStickyId: z.number().optional(),  // Deprecated - kept for backward compatibility
 });
 
 export interface MariposaSidecar {
   items: Record<string, ItemMeta>;
   sections: Record<string, SectionData>;
   stickies: Record<string, StickyData>;
-  nextSectionId: number;
-  nextStickyId: number;
+  images: Record<string, ImageMeta>;
+  nextSectionId?: number; // Deprecated - kept for backward compatibility
+  nextStickyId?: number;  // Deprecated - kept for backward compatibility
 }
 
 // === Folder entry (returned by folder listing) ===

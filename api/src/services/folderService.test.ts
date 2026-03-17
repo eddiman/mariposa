@@ -134,8 +134,7 @@ describe('FolderService', () => {
         items: {},
         sections: {},
         stickies: {},
-        nextSectionId: 1,
-        nextStickyId: 1,
+        images: {},
       });
     });
 
@@ -175,37 +174,38 @@ describe('FolderService', () => {
   });
 
   describe('sections', () => {
-    it('creates a section with auto-incrementing ID', async () => {
+    it('creates a section with UUID-based ID', async () => {
       await createTestKb('test-kb');
 
       const result1 = await folderService.createSection('test-kb', '', { name: 'First' });
       expect(result1).not.toBeNull();
-      expect(result1!.id).toBe('section-1');
+      expect(result1!.id).toMatch(/^section-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(result1!.section.name).toBe('First');
 
       const result2 = await folderService.createSection('test-kb', '', { name: 'Second' });
-      expect(result2!.id).toBe('section-2');
+      expect(result2!.id).toMatch(/^section-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(result2!.id).not.toBe(result1!.id); // Unique IDs
 
       const meta = await folderService.getMeta('test-kb');
       expect(Object.keys(meta!.sections)).toHaveLength(2);
-      expect(meta!.nextSectionId).toBe(3);
     });
 
     it('deletes a section and clears item references', async () => {
       await createTestKb('test-kb');
 
-      await folderService.createSection('test-kb', '', { name: 'Target' });
+      const result = await folderService.createSection('test-kb', '', { name: 'Target' });
+      const sectionId = result!.id;
 
       // Assign an item to the section
       await folderService.updateMeta('test-kb', '', {
-        items: { 'note.md': { section: 'section-1' } },
+        items: { 'note.md': { section: sectionId } },
       });
 
-      const deleted = await folderService.deleteSection('test-kb', '', 'section-1');
+      const deleted = await folderService.deleteSection('test-kb', '', sectionId);
       expect(deleted).toBe(true);
 
       const meta = await folderService.getMeta('test-kb');
-      expect(meta!.sections['section-1']).toBeUndefined();
+      expect(meta!.sections[sectionId]).toBeUndefined();
       expect(meta!.items['note.md'].section).toBeUndefined();
     });
 
@@ -217,29 +217,31 @@ describe('FolderService', () => {
   });
 
   describe('stickies', () => {
-    it('creates a sticky with auto-incrementing ID', async () => {
+    it('creates a sticky with UUID-based ID', async () => {
       await createTestKb('test-kb');
 
       const result1 = await folderService.createSticky('test-kb', '', { text: 'Hello', color: 'pink' });
       expect(result1).not.toBeNull();
-      expect(result1!.id).toBe('sticky-1');
+      expect(result1!.id).toMatch(/^sticky-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(result1!.sticky.text).toBe('Hello');
       expect(result1!.sticky.color).toBe('pink');
 
       const result2 = await folderService.createSticky('test-kb', '', {});
-      expect(result2!.id).toBe('sticky-2');
+      expect(result2!.id).toMatch(/^sticky-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(result2!.id).not.toBe(result1!.id); // Unique IDs
       expect(result2!.sticky.color).toBe('yellow'); // default
     });
 
     it('deletes a sticky', async () => {
       await createTestKb('test-kb');
-      await folderService.createSticky('test-kb', '', { text: 'Remove me' });
+      const result = await folderService.createSticky('test-kb', '', { text: 'Remove me' });
+      const stickyId = result!.id;
 
-      const deleted = await folderService.deleteSticky('test-kb', '', 'sticky-1');
+      const deleted = await folderService.deleteSticky('test-kb', '', stickyId);
       expect(deleted).toBe(true);
 
       const meta = await folderService.getMeta('test-kb');
-      expect(meta!.stickies['sticky-1']).toBeUndefined();
+      expect(meta!.stickies[stickyId]).toBeUndefined();
     });
   });
 });

@@ -78,7 +78,7 @@ function AppContent() {
     deleteSticky,
   } = useFolder(folderOptions);
 
-  const { images, uploadImage, updateImagePosition, updateImageSize, deleteImage } = useImages({ kb: currentKb });
+  const { images, uploadImage, updateImagePosition, updateImageSize, deleteImage } = useImages({ kb: currentKb, path: currentPath });
 
   // Build NoteFile[] from folder entries + metadata for the canvas
   const canvasNotes: NoteFile[] = useMemo(() => {

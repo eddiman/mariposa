@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import type { CanvasImage, Position } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,23 +10,9 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (..
   };
 }
 
-const POSITIONS_STORAGE_KEY = 'mariposa-image-positions';
-
-function loadPositions(): Record<string, { position: Position; displayWidth?: number; displayHeight?: number }> {
-  try {
-    const stored = localStorage.getItem(POSITIONS_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePositions(positions: Record<string, { position: Position; displayWidth?: number; displayHeight?: number }>) {
-  localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(positions));
-}
-
 interface UseImagesOptions {
   kb: string | null;
+  path: string;
 }
 
 interface UseImagesReturn {
@@ -39,10 +25,10 @@ interface UseImagesReturn {
 }
 
 export function useImages(options: UseImagesOptions): UseImagesReturn {
-  const { kb } = options;
+  const { kb, path } = options;
   const [images, setImages] = useState<CanvasImage[]>([]);
   const [loading, setLoading] = useState(false);
-  const positionsRef = useRef(loadPositions());
+  const imageMetaCache = useRef<Record<string, { position?: Position; width?: number; height?: number }>>({});
 
   const fetchImages = useCallback(async () => {
     if (!kb) {
@@ -52,16 +38,24 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
 
     setLoading(true);
     try {
+      // Fetch image list from assets API
       const res = await fetch(`/api/assets?kb=${encodeURIComponent(kb)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      
+      // Fetch folder metadata to get image positions
+      const metaRes = await fetch(`/api/folders/meta?kb=${encodeURIComponent(kb)}&path=${encodeURIComponent(path)}`);
+      const meta = metaRes.ok ? await metaRes.json() : { images: {} };
+      
+      imageMetaCache.current = meta.images || {};
+      
       const fetchedImages: CanvasImage[] = (data.images || []).map((img: CanvasImage) => {
-        const stored = positionsRef.current[img.id];
+        const stored = imageMetaCache.current[img.id];
         return {
           ...img,
           position: stored?.position || { x: Math.random() * 400, y: Math.random() * 400 },
-          displayWidth: stored?.displayWidth,
-          displayHeight: stored?.displayHeight,
+          displayWidth: stored?.width,
+          displayHeight: stored?.height,
           status: 'ready' as const,
         };
       });
@@ -71,7 +65,7 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
     } finally {
       setLoading(false);
     }
-  }, [kb]);
+  }, [kb, path]);
 
   useEffect(() => {
     fetchImages();
@@ -109,8 +103,14 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
         status: 'ready',
       };
 
-      positionsRef.current[metadata.id] = { position };
-      savePositions(positionsRef.current);
+      // Save position to server
+      await fetch(`/api/folders/images?kb=${encodeURIComponent(kb)}&path=${encodeURIComponent(path)}&id=${metadata.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position, width: metadata.width, height: metadata.height })
+      });
+
+      imageMetaCache.current[metadata.id] = { position, width: metadata.width, height: metadata.height };
 
       setImages(prev => prev.map(img => img.id === tempId ? newImage : img));
       return newImage;
@@ -121,23 +121,40 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
       ));
       return null;
     }
-  }, [kb]);
+  }, [kb, path]);
 
-  const debouncedSavePositions = useRef(debounce(() => savePositions(positionsRef.current), 300));
+  const debouncedUpdatePosition = useMemo(
+    () => debounce(async (imageId: string, position: Position, width?: number, height?: number) => {
+      if (!kb) return;
+      try {
+        await fetch(`/api/folders/images?kb=${encodeURIComponent(kb)}&path=${encodeURIComponent(path)}&id=${imageId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position, width, height })
+        });
+      } catch (err) {
+        console.error('Failed to update image position:', err);
+      }
+    }, 300),
+    [kb, path]
+  );
 
   const updateImagePosition = useCallback((id: string, position: Position) => {
     setImages(prev => prev.map(img => img.id === id ? { ...img, position } : img));
-    positionsRef.current[id] = { ...positionsRef.current[id], position };
-    debouncedSavePositions.current();
-  }, []);
+    imageMetaCache.current[id] = { ...imageMetaCache.current[id], position };
+    debouncedUpdatePosition(id, position, imageMetaCache.current[id]?.width, imageMetaCache.current[id]?.height);
+  }, [debouncedUpdatePosition]);
 
   const updateImageSize = useCallback((id: string, displayWidth: number, displayHeight: number) => {
     setImages(prev => prev.map(img =>
       img.id === id ? { ...img, displayWidth, displayHeight } : img,
     ));
-    positionsRef.current[id] = { ...positionsRef.current[id], displayWidth, displayHeight };
-    debouncedSavePositions.current();
-  }, []);
+    imageMetaCache.current[id] = { ...imageMetaCache.current[id], width: displayWidth, height: displayHeight };
+    const position = imageMetaCache.current[id]?.position || images.find(img => img.id === id)?.position;
+    if (position) {
+      debouncedUpdatePosition(id, position, displayWidth, displayHeight);
+    }
+  }, [debouncedUpdatePosition, images]);
 
   const deleteImage = useCallback(async (id: string): Promise<boolean> => {
     if (!kb) return false;
@@ -145,18 +162,23 @@ export function useImages(options: UseImagesOptions): UseImagesReturn {
     setImages(prev => prev.filter(img => img.id !== id));
 
     try {
+      // Delete image file
       const res = await fetch(`/api/assets/${id}?kb=${encodeURIComponent(kb)}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
 
-      delete positionsRef.current[id];
-      savePositions(positionsRef.current);
+      // Delete image position metadata
+      await fetch(`/api/folders/images?kb=${encodeURIComponent(kb)}&path=${encodeURIComponent(path)}&id=${id}`, {
+        method: 'DELETE'
+      });
+
+      delete imageMetaCache.current[id];
       return true;
     } catch (err) {
       console.error('Failed to delete image:', err);
       await fetchImages();
       return false;
     }
-  }, [kb, fetchImages]);
+  }, [kb, path, fetchImages]);
 
   return { images, loading, uploadImage, updateImagePosition, updateImageSize, deleteImage };
 }
