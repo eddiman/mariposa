@@ -4,15 +4,24 @@ import path from 'path';
 import os from 'os';
 import { kbService } from './kbService.js';
 import { configService } from './configService.js';
+import { registryService } from './registryService.js';
 import { config } from '../config.js';
 
 let tempDir: string;
 let kbRoot: string;
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mariposa-test-kb-'));
   kbRoot = path.join(tempDir, 'kbs');
   await fs.mkdir(kbRoot);
+
+  // Prevent registryService from finding real ~/.adjutant
+  originalHome = process.env.HOME;
+  process.env.HOME = tempDir;
+  delete process.env.ADJUTANT_DIR;
+  delete process.env.ADJ_DIR;
+  registryService.clearCache();
 
   // Patch config to use temp dir
   Object.defineProperty(config, 'configDir', { value: tempDir, writable: true, configurable: true });
@@ -31,6 +40,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  process.env.HOME = originalHome;
+  registryService.clearCache();
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 

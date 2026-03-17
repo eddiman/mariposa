@@ -5,16 +5,24 @@ import path from 'path';
 import os from 'os';
 import { createApp } from '../index.js';
 import { configService } from '../services/configService.js';
+import { registryService } from '../services/registryService.js';
 import { config } from '../config.js';
 
 let tempDir: string;
 let kbRoot: string;
 let app: ReturnType<typeof createApp>;
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mariposa-test-routes-'));
   kbRoot = path.join(tempDir, 'kbs');
   await fs.mkdir(kbRoot);
+
+  originalHome = process.env.HOME;
+  process.env.HOME = tempDir;
+  delete process.env.ADJUTANT_DIR;
+  delete process.env.ADJ_DIR;
+  registryService.clearCache();
 
   Object.defineProperty(config, 'configDir', { value: tempDir, writable: true, configurable: true });
   Object.defineProperty(config, 'configFile', {
@@ -27,7 +35,7 @@ beforeEach(async () => {
   await fs.mkdir(kbDir);
   await fs.writeFile(
     path.join(kbDir, 'kb.yaml'),
-    'name: test-kb\ndescription: A test KB\naccess: read-only\n',
+    'name: test-kb\ndescription: A test KB\naccess: read-write\n',
     'utf-8',
   );
   await fs.mkdir(path.join(kbDir, 'data'));
@@ -54,6 +62,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  process.env.HOME = originalHome;
+  registryService.clearCache();
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 

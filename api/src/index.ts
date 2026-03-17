@@ -1,11 +1,15 @@
 import express from 'express';
 import { config } from './config.js';
 import { configService } from './services/configService.js';
+import { kbService } from './services/kbService.js';
+import { authenticate } from './middleware/auth.js';
+import { enforceAccess } from './middleware/accessControl.js';
 import configRouter from './routes/config.js';
 import kbsRouter from './routes/kbs.js';
 import foldersRouter from './routes/folders.js';
 import notesRouter from './routes/notes.js';
 import assetsRouter from './routes/assets.js';
+import adjutantRouter from './routes/adjutant.js';
 
 export function createApp() {
   const app = express();
@@ -49,12 +53,21 @@ export function createApp() {
     next();
   });
 
+  // Authentication (optional — enabled when MARIPOSA_SESSION_TOKEN is set)
+  app.use('/api', authenticate);
+
+  // Access control (block writes to read-only KBs)
+  app.use('/api/notes', enforceAccess);
+  app.use('/api/folders', enforceAccess);
+  app.use('/api/assets', enforceAccess);
+
   // Routes
   app.use('/api/config', configRouter);
   app.use('/api/kbs', kbsRouter);
   app.use('/api/folders', foldersRouter);
   app.use('/api/notes', notesRouter);
   app.use('/api/assets', assetsRouter);
+  app.use('/api/adjutant', adjutantRouter);
 
   // Health check
   app.get('/health', (_req, res) => {
@@ -83,30 +96,17 @@ async function start() {
     const app = createApp();
 
     app.listen(config.port, config.host, async () => {
+      const mode = await kbService.getMode();
       const kbRoot = await configService.getKbRoot();
+      const kbs = await kbService.list();
 
       console.log(`Mariposa KB Explorer running on http://${config.host}:${config.port}`);
-      console.log(`KB root: ${kbRoot || '(not configured — set via /api/config)'}`);
-      console.log('\nREST API endpoints:');
-      console.log('  GET    /api/config               - Get app config');
-      console.log('  PUT    /api/config               - Update app config');
-      console.log('  GET    /api/kbs                  - List knowledge bases');
-      console.log('  GET    /api/kbs/:name            - Get KB metadata');
-      console.log('  GET    /api/folders              - List folder contents');
-      console.log('  GET    /api/folders/meta          - Get folder canvas metadata');
-      console.log('  PUT    /api/folders/meta          - Update folder canvas metadata');
-      console.log('  POST   /api/folders/sections      - Create section');
-      console.log('  DELETE /api/folders/sections      - Delete section');
-      console.log('  POST   /api/folders/stickies      - Create sticky');
-      console.log('  DELETE /api/folders/stickies      - Delete sticky');
-      console.log('  GET    /api/notes                - Get a note');
-      console.log('  POST   /api/notes                - Create a note');
-      console.log('  PUT    /api/notes                - Update a note');
-      console.log('  DELETE /api/notes                - Delete a note');
-      console.log('  GET    /api/notes/search         - Search notes');
-      console.log('  GET    /api/assets               - List images');
-      console.log('  GET    /api/assets/:file          - Serve image');
-      console.log('  GET    /health                   - Health check');
+      console.log(`Mode: ${mode}`);
+      if (mode === 'adjutant') {
+        console.log(`Adjutant integration active — ${kbs.length} KBs from registry`);
+      } else {
+        console.log(`KB root: ${kbRoot || '(not configured — set via /api/config)'}`);
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);

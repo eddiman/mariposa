@@ -4,15 +4,23 @@ import path from 'path';
 import os from 'os';
 import { folderService } from './folderService.js';
 import { configService } from './configService.js';
+import { registryService } from './registryService.js';
 import { config } from '../config.js';
 
 let tempDir: string;
 let kbRoot: string;
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mariposa-test-folder-'));
   kbRoot = path.join(tempDir, 'kbs');
   await fs.mkdir(kbRoot);
+
+  originalHome = process.env.HOME;
+  process.env.HOME = tempDir;
+  delete process.env.ADJUTANT_DIR;
+  delete process.env.ADJ_DIR;
+  registryService.clearCache();
 
   Object.defineProperty(config, 'configDir', { value: tempDir, writable: true, configurable: true });
   Object.defineProperty(config, 'configFile', {
@@ -29,6 +37,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  process.env.HOME = originalHome;
+  registryService.clearCache();
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 

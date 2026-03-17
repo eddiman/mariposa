@@ -1,16 +1,77 @@
+/**
+ * KB discovery service.
+ *
+ * Two modes of operation:
+ * 1. Adjutant mode — reads from Adjutant's knowledge_bases/registry.yaml
+ *    (when ADJUTANT_DIR / ADJ_DIR is set or ~/.adjutant exists)
+ * 2. Standalone mode — scans kbRoot directory for subdirs with kb.yaml
+ *    (legacy behavior, used when no Adjutant registry found)
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import { configService } from './configService.js';
+import { registryService } from './registryService.js';
 import { KbYamlSchema } from '../types/kb.js';
 import type { KbMeta } from '../types/kb.js';
 
 class KbService {
   /**
-   * Discover all KBs by scanning the kbRoot directory for subdirectories
-   * containing a kb.yaml file.
+   * Discover all KBs. Prefers Adjutant registry, falls back to standalone scan.
    */
   async list(): Promise<KbMeta[]> {
+    // Try Adjutant registry first
+    if (await registryService.isAvailable()) {
+      return registryService.list();
+    }
+
+    // Fallback: standalone mode (scan kbRoot)
+    return this.listStandalone();
+  }
+
+  /**
+   * Get metadata for a single KB by name.
+   */
+  async get(name: string): Promise<KbMeta | null> {
+    // Prevent path traversal
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return null;
+    }
+
+    if (await registryService.isAvailable()) {
+      return registryService.get(name);
+    }
+
+    return this.getStandalone(name);
+  }
+
+  /**
+   * Resolve a KB name to its absolute filesystem path.
+   * Returns null if KB doesn't exist or path traversal detected.
+   */
+  async resolveKbPath(name: string): Promise<string | null> {
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return null;
+    }
+
+    if (await registryService.isAvailable()) {
+      return registryService.resolveKbPath(name);
+    }
+
+    return this.resolveKbPathStandalone(name);
+  }
+
+  /**
+   * Check whether we're running in Adjutant mode or standalone.
+   */
+  async getMode(): Promise<'adjutant' | 'standalone'> {
+    return (await registryService.isAvailable()) ? 'adjutant' : 'standalone';
+  }
+
+  // === Standalone mode (legacy) ===
+
+  private async listStandalone(): Promise<KbMeta[]> {
     const kbRoot = await configService.getKbRoot();
     if (!kbRoot) return [];
 
@@ -29,40 +90,23 @@ class KbService {
         }
       }
     } catch {
-      // kbRoot doesn't exist or can't be read
       return [];
     }
 
     return kbs.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /**
-   * Get metadata for a single KB by name.
-   */
-  async get(name: string): Promise<KbMeta | null> {
+  private async getStandalone(name: string): Promise<KbMeta | null> {
     const kbRoot = await configService.getKbRoot();
     if (!kbRoot) return null;
-
-    // Prevent path traversal
-    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
-      return null;
-    }
 
     const kbPath = path.join(kbRoot, name);
     return this.parseKbYaml(kbPath);
   }
 
-  /**
-   * Resolve a KB name to its absolute filesystem path.
-   * Returns null if KB doesn't exist or path traversal detected.
-   */
-  async resolveKbPath(name: string): Promise<string | null> {
+  private async resolveKbPathStandalone(name: string): Promise<string | null> {
     const kbRoot = await configService.getKbRoot();
     if (!kbRoot) return null;
-
-    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
-      return null;
-    }
 
     const kbPath = path.join(kbRoot, name);
 
