@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import type { Settings, Theme } from '../../types';
 import styles from './SettingsDialog.module.css';
 
@@ -20,6 +20,8 @@ export function SettingsDialog({
   const [kbRootInput, setKbRootInput] = useState(settings.kbRoot || '');
   const [kbRootError, setKbRootError] = useState<string | null>(null);
   const [kbRootSaving, setKbRootSaving] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const browsingRef = useRef(false);
 
   // Sync input when settings load
   useEffect(() => {
@@ -64,6 +66,30 @@ export function SettingsDialog({
     }
   }, [kbRootInput, onSettingChange, onKbRootSaved]);
 
+  const handleBrowse = useCallback(async () => {
+    if (browsingRef.current) return;
+    browsingRef.current = true;
+    setBrowsing(true);
+    setKbRootError(null);
+    try {
+      const res = await fetch('/api/config/browse', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        setKbRootError(data.error || 'Browse not supported');
+        return;
+      }
+      const data = await res.json();
+      if (!data.cancelled && data.path) {
+        setKbRootInput(data.path);
+      }
+    } catch {
+      setKbRootError('Failed to open directory picker');
+    } finally {
+      setBrowsing(false);
+      browsingRef.current = false;
+    }
+  }, []);
+
   if (!open) return null;
 
   return (
@@ -100,6 +126,22 @@ export function SettingsDialog({
                   onKeyDown={e => { if (e.key === 'Enter') handleKbRootSave(); }}
                 />
                 <button
+                  className={styles['settings-browse-btn']}
+                  onClick={handleBrowse}
+                  disabled={browsing}
+                  title="Browse with Finder"
+                >
+                  {browsing ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles['settings-browse-spinner']}>
+                      <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                    </svg>
+                  )}
+                </button>
+                <button
                   className={styles['settings-kb-root-save']}
                   onClick={handleKbRootSave}
                   disabled={kbRootSaving || !kbRootInput.trim()}
@@ -109,6 +151,25 @@ export function SettingsDialog({
               </div>
               {kbRootError && (
                 <span className={styles['settings-error']}>{kbRootError}</span>
+              )}
+              {settings.kbRoot && (
+                <button
+                  className={styles['settings-reveal-btn']}
+                  onClick={() => {
+                    fetch('/api/config/reveal', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ path: settings.kbRoot }),
+                    }).catch(() => {});
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
+                  Reveal in Finder
+                </button>
               )}
             </div>
           </div>
