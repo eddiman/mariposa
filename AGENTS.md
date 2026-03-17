@@ -4,183 +4,128 @@ Guidelines for AI coding agents working on this codebase.
 
 ## Project Overview
 
-Mariposa is a local-first, canvas-based note-taking application. Notes, sections, stickies, and images live on an infinite spatial canvas powered by React Flow. All data is stored as local files — Markdown with YAML frontmatter for notes, JSON for sections and stickies, WebP for images.
+Mariposa is a local-first knowledge base explorer. It discovers Adjutant-format KBs (directories containing `kb.yaml`) under a user-configured root directory and presents their contents on an infinite spatial canvas powered by React Flow. Users can browse folders, view and create notes, organize with sections and stickies, and upload images. All KB metadata is stored in `.mariposa.json` sidecar files so `.md` files stay clean.
 
-- **API** (`api/`): Express REST API with MCP (Model Context Protocol) integration
-- **Web** (`web/`): React 19 frontend with infinite canvas, rich text editor, and theming
+- **API** (`api/`): Express REST API — KB discovery, folder browsing, note CRUD, image management
+- **Web** (`web/`): React 19 frontend — canvas-based KB explorer with rich text editor
 
 ## Project Structure
 
 ```
 mariposa/
-├── api/                              # Express API server (port 3020)
+├── api/                                  # Express API server (port 3020)
 │   ├── src/
-│   │   ├── index.ts                  # Express app setup, middleware, server start
-│   │   ├── config.ts                 # Configuration constants (ports, paths, defaults)
-│   │   ├── mcp/
-│   │   │   └── server.ts             # MCP server: 8 tools, 4 prompts
+│   │   ├── index.ts                      # Express app setup, createApp(), middleware, server start
+│   │   ├── config.ts                     # Static config (port, host, ~/.mariposa paths)
 │   │   ├── routes/
-│   │   │   ├── notes.ts              # Note CRUD endpoints
-│   │   │   ├── categories.ts         # Category management + metadata
-│   │   │   ├── tags.ts               # Tag listing
-│   │   │   ├── assets.ts             # Image upload/serve/delete (Sharp + multer)
-│   │   │   ├── sections.ts           # Section CRUD
-│   │   │   ├── stickies.ts           # Sticky CRUD
-│   │   │   └── mcp.ts                # MCP Streamable HTTP transport
+│   │   │   ├── config.ts                 # GET/PUT /api/config, POST browse (Finder), POST reveal
+│   │   │   ├── kbs.ts                    # GET /api/kbs — KB discovery + metadata
+│   │   │   ├── folders.ts               # GET/PUT /api/folders — folder listing + .mariposa.json CRUD + sections/stickies
+│   │   │   ├── notes.ts                 # GET/POST/PUT/DELETE /api/notes + search
+│   │   │   ├── assets.ts                # Image upload/serve/delete (Sharp + multer), KB-scoped
+│   │   │   └── routes.test.ts           # Integration tests (supertest, 24 tests)
 │   │   ├── services/
-│   │   │   ├── noteService.ts        # Note file I/O, search, CRUD
-│   │   │   ├── imageService.ts       # Image processing (Sharp → WebP + thumbnails)
-│   │   │   ├── sectionService.ts     # Section JSON file I/O
-│   │   │   └── stickyService.ts      # Sticky JSON file I/O
-│   │   ├── types/
-│   │   │   ├── note.ts               # Note, NoteMeta, Zod schemas
-│   │   │   ├── section.ts            # Section type + Zod schemas
-│   │   │   └── sticky.ts             # Sticky type + Zod schemas
-│   │   └── utils/
-│   │       ├── frontmatter.ts        # YAML frontmatter parse/stringify
-│   │       └── slugGenerator.ts      # Auto-incrementing slug counter
-│   ├── notes/                        # Note storage (markdown files, category subdirs)
-│   │   └── .assets/images/           # Image storage (WebP + thumbnails + metadata JSON)
+│   │   │   ├── configService.ts          # Read/write ~/.mariposa/config.json, kbRoot validation
+│   │   │   ├── configService.test.ts     # 6 tests
+│   │   │   ├── kbService.ts              # Discover KBs (scan for kb.yaml), parse metadata
+│   │   │   ├── kbService.test.ts         # 9 tests
+│   │   │   ├── folderService.ts          # List folders, read/write .mariposa.json, sections, stickies
+│   │   │   ├── folderService.test.ts     # 15 tests
+│   │   │   ├── fileNoteService.ts        # Note CRUD (create/read/update/delete/search .md files)
+│   │   │   ├── fileNoteService.test.ts   # 33 tests
+│   │   │   └── imageService.ts           # Sharp → WebP + thumbnails, KB-scoped in .mariposa/assets/
+│   │   └── types/
+│   │       ├── config.ts                 # AppConfig, Zod schema
+│   │       ├── kb.ts                     # KbMeta, KbYamlSchema (Adjutant format)
+│   │       ├── folder.ts                 # MariposaSidecar, FolderEntry, Section/Sticky schemas
+│   │       └── note.ts                   # NoteFile, NoteMeta, NoteCreate/UpdateSchema
+│   ├── vitest.config.ts
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── web/                              # React frontend (port 3021)
+├── web/                                  # React frontend (port 3021)
 │   ├── src/
-│   │   ├── main.tsx                  # React root + BrowserRouter
-│   │   ├── App.tsx                   # Main app: routing, state orchestration, canvas
-│   │   ├── index.css                 # Design tokens, color scales, themes
+│   │   ├── main.tsx                      # React root + BrowserRouter
+│   │   ├── App.tsx                       # Main app: wildcard routing, state orchestration, canvas
+│   │   ├── index.css                     # Design tokens, color scales, themes
 │   │   ├── types/
-│   │   │   └── index.ts              # Shared TypeScript types
+│   │   │   └── index.ts                  # Shared TypeScript types (KbMeta, NoteFile, Section, etc.)
 │   │   ├── utils/
-│   │   │   ├── platform.ts           # OS/touch detection helpers
-│   │   │   └── sectionPositioning.ts # Section layout calculations
+│   │   │   ├── platform.ts              # OS/touch detection helpers
+│   │   │   └── sectionPositioning.ts    # Section layout calculations
 │   │   ├── contexts/
-│   │   │   ├── index.ts              # Barrel export
-│   │   │   ├── EditorContext.tsx      # Note editor overlay state + animation origin
-│   │   │   ├── PlacementContext.tsx   # Placement mode for creating items on canvas
-│   │   │   └── CategoryDialogContext.tsx  # Category dialog state + mode
+│   │   │   ├── index.ts                 # Barrel export
+│   │   │   ├── EditorContext.tsx         # Note editor overlay state + animation origin
+│   │   │   └── PlacementContext.tsx      # Placement mode for creating items on canvas
 │   │   ├── hooks/
-│   │   │   ├── useCanvas.ts          # Space navigation via URL params, category CRUD
-│   │   │   ├── useNotes.ts           # Note CRUD with optimistic updates, debounced saves
-│   │   │   ├── useImages.ts          # Image upload/duplicate/delete, localStorage positions
-│   │   │   ├── useSections.ts        # Section CRUD with optimistic updates, debounced saves
-│   │   │   ├── useStickies.ts        # Sticky CRUD with optimistic updates, debounced saves
-│   │   │   ├── useSettings.ts        # App settings (theme, snap) persisted in localStorage
-│   │   │   ├── useCanvasHistory.ts   # Undo/redo stack (max 50 entries)
-│   │   │   ├── useSnapToGuides.ts    # Snap-to-guide alignment (8px threshold)
-│   │   │   ├── useCanvasNodeDrag.ts  # Drag lifecycle: select, snap, persist, section membership
-│   │   │   ├── useCanvasClipboard.ts # Copy/paste nodes (system + in-memory clipboard)
-│   │   │   ├── useCanvasContextMenu.tsx  # Right-click menu items for canvas and nodes
-│   │   │   ├── useCanvasKeyboard.ts  # Keyboard shortcuts (undo, copy, delete, escape, S/T modes)
-│   │   │   ├── useCanvasTouchGestures.ts # Long-press + two-finger tap context menus
-│   │   │   ├── useSidebarNotes.ts    # Sidebar note interactions (focus, edit, add)
-│   │   │   └── useCategoryNotes.ts   # Lazy-load + cache notes per category for sidebar
+│   │   │   ├── useKbs.ts               # Fetch + cache KB list from /api/kbs
+│   │   │   ├── useCanvas.ts            # KB + folder path from URL params, navigation
+│   │   │   ├── useFolder.ts            # Folder entries + .mariposa.json CRUD, sections, stickies
+│   │   │   ├── useNotes.ts             # Note CRUD (create/read/update/delete/search)
+│   │   │   ├── useImages.ts            # KB-scoped image upload/delete, localStorage positions
+│   │   │   ├── useSettings.ts          # Theme, snap, kbRoot (server-side) settings
+│   │   │   ├── useCanvasHistory.ts     # Undo/redo stack (max 50 entries)
+│   │   │   ├── useSnapToGuides.ts      # Snap-to-guide alignment (8px threshold)
+│   │   │   ├── useCanvasNodeDrag.ts    # Drag lifecycle: select, snap, persist, section membership
+│   │   │   ├── useCanvasClipboard.ts   # Copy/paste nodes (system + in-memory clipboard)
+│   │   │   ├── useCanvasContextMenu.tsx # Right-click menu items for canvas and nodes
+│   │   │   ├── useCanvasKeyboard.ts    # Keyboard shortcuts (undo, copy, delete, escape, S/T)
+│   │   │   └── useCanvasTouchGestures.ts # Long-press + two-finger tap context menus
 │   │   └── components/
-│   │       ├── Canvas/               # Main canvas wrapper (React Flow container)
+│   │       ├── Canvas/                  # Main canvas wrapper (React Flow container)
 │   │       │   ├── Canvas.tsx
 │   │       │   ├── Canvas.module.css
 │   │       │   ├── CanvasLoader.tsx
 │   │       │   └── index.ts
-│   │       ├── nodes/                # Custom React Flow node types
-│   │       │   ├── index.ts          # nodeTypes map export
-│   │       │   ├── NoteNode.tsx      # Note card with title + TipTap preview
-│   │       │   ├── NoteNode.module.css
-│   │       │   ├── ImageNode.tsx     # Image with upload states + corner resize
-│   │       │   ├── ImageNode.module.css
-│   │       │   ├── SectionNode.tsx   # Grouping rectangle with editable label + resize handles
-│   │       │   ├── SectionNode.module.css
-│   │       │   ├── StickyNode.tsx    # Colored sticky with inline text editing
-│   │       │   └── StickyNode.module.css
-│   │       ├── Home/                 # Home page (search-first landing)
-│   │       │   ├── Home.tsx
+│   │       ├── nodes/                   # Custom React Flow node types
+│   │       │   ├── index.ts            # nodeTypes map export
+│   │       │   ├── NoteNode.tsx        # Note card with title + TipTap preview
+│   │       │   ├── ImageNode.tsx       # Image with upload states + corner resize
+│   │       │   ├── SectionNode.tsx     # Grouping rectangle with editable label + resize
+│   │       │   └── StickyNode.tsx      # Colored sticky with inline editing
+│   │       ├── Home/                    # Home page — KB browser
+│   │       │   ├── Home.tsx            # KB cards, cross-KB search, setup prompt
 │   │       │   ├── Home.module.css
 │   │       │   ├── AnimatedBackground.tsx
-│   │       │   ├── AnimatedBackground.module.css
-│   │       │   ├── SearchCard.tsx
-│   │       │   └── SearchCard.module.css
-│   │       ├── Editor/              # Full-screen note editor overlay
-│   │       │   ├── Editor.tsx
+│   │       │   └── index.ts
+│   │       ├── Editor/                  # TipTap rich text editor (used inside NoteEditor)
+│   │       │   ├── Editor.tsx          # TipTap with markdown, image paste/drop, KB-scoped upload
 │   │       │   ├── Editor.module.css
 │   │       │   └── index.ts
-│   │       ├── NoteEditor/          # TipTap editor instance
-│   │       │   ├── NoteEditor.tsx
+│   │       ├── NoteEditor/             # Full-screen note editor overlay
+│   │       │   ├── NoteEditor.tsx      # Title, tags, autosave, delete, expand/collapse animation
 │   │       │   ├── NoteEditor.module.css
 │   │       │   └── index.ts
-│   │       ├── Sidebar/             # Navigation sidebar with category tree
-│   │       │   ├── index.ts
-│   │       │   ├── Sidebar.tsx
+│   │       ├── Sidebar/                # Navigation sidebar — KB list + folder tree
+│   │       │   ├── Sidebar.tsx         # KB list, breadcrumbs, folder entries
 │   │       │   ├── Sidebar.module.css
-│   │       │   ├── SidebarAllNotes.tsx
-│   │       │   ├── SidebarAllNotesView.tsx
-│   │       │   ├── SidebarCategoryItem.tsx
-│   │       │   ├── SidebarCategoryView.tsx
-│   │       │   └── SidebarNoteItem.tsx
-│   │       ├── Toolbar/             # Bottom toolbar (add note/section/sticky/image)
-│   │       │   ├── Toolbar.tsx
-│   │       │   ├── Toolbar.module.css
 │   │       │   └── index.ts
-│   │       ├── ToolSwitcher/        # Tool mode switcher (pan/select)
-│   │       │   ├── ToolSwitcher.tsx
-│   │       │   ├── ToolSwitcher.module.css
-│   │       │   └── index.ts
-│   │       ├── SelectionToolbar/    # Toolbar for multi-selected nodes
-│   │       │   ├── SelectionToolbar.tsx
-│   │       │   ├── SelectionToolbar.module.css
-│   │       │   └── index.ts
-│   │       ├── ContextMenu/         # Right-click context menu
-│   │       │   ├── ContextMenu.tsx
-│   │       │   ├── ContextMenu.module.css
-│   │       │   └── index.ts
-│   │       ├── SnapGuides/          # Visual alignment guides during drag
-│   │       │   ├── SnapGuides.tsx
-│   │       │   ├── SnapGuides.module.css
-│   │       │   └── index.ts
-│   │       ├── GhostNote/           # Placement mode preview for notes
-│   │       │   ├── GhostNote.tsx
-│   │       │   ├── GhostNote.module.css
-│   │       │   └── index.ts
-│   │       ├── GhostSection/        # Placement mode preview for sections
-│   │       │   ├── GhostSection.tsx
-│   │       │   ├── GhostSection.module.css
-│   │       │   └── index.ts
-│   │       ├── GhostSticky/         # Placement mode preview for stickies
-│   │       │   ├── GhostSticky.tsx
-│   │       │   ├── GhostSticky.module.css
-│   │       │   └── index.ts
-│   │       ├── PlacementHint/       # UI hint during placement mode
-│   │       │   ├── PlacementHint.tsx
-│   │       │   ├── PlacementHint.module.css
-│   │       │   └── index.ts
-│   │       ├── CategoryDialog/      # Category create/rename/delete dialog
-│   │       │   ├── CategoryDialog.tsx
-│   │       │   ├── CategoryDialog.module.css
-│   │       │   └── index.ts
-│   │       ├── SettingsDialog/      # App settings (theme, snap options)
-│   │       │   ├── SettingsDialog.tsx
-│   │       │   ├── SettingsDialog.module.css
-│   │       │   └── index.ts
-│   │       ├── Dialog/              # Generic dialog wrapper
-│   │       │   ├── Dialog.tsx
-│   │       │   ├── Dialog.module.css
-│   │       │   └── index.ts
-│   │       ├── TagInput/            # Tag input component for editor
-│   │       │   ├── TagInput.tsx
-│   │       │   ├── TagInput.module.css
-│   │       │   └── index.ts
-│   │       └── AdaptiveBackground/  # Background that adapts to theme
-│   │           ├── AdaptiveBackground.tsx
-│   │           └── index.ts
+│   │       ├── Toolbar/                # Bottom toolbar (add note/section/sticky/image)
+│   │       ├── ToolSwitcher/           # Tool mode switcher (pan/select)
+│   │       ├── SelectionToolbar/       # Toolbar for multi-selected nodes
+│   │       ├── ContextMenu/            # Right-click context menu
+│   │       ├── SnapGuides/             # Visual alignment guides during drag
+│   │       ├── GhostSection/           # Placement mode preview for sections
+│   │       ├── GhostSticky/            # Placement mode preview for stickies
+│   │       ├── PlacementHint/          # UI hint during placement mode
+│   │       ├── SettingsDialog/         # App settings (KB root + Finder browse, theme, snap)
+│   │       ├── Dialog/                 # Generic dialog wrapper
+│   │       ├── TagInput/               # Tag input component for editor
+│   │       └── AdaptiveBackground/     # Background that adapts to theme
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
 │
-├── owui-mariposa-filter/             # Open WebUI integration (filter/pipe functions)
 ├── docs/
-│   ├── architecture.md               # System design
-│   └── roadmap.md                    # Future plans
+│   ├── architecture.md                  # System design
+│   ├── roadmap.md                       # Future plans (Phase 2: Local AI)
+│   ├── kb-explorer-rewrite.md           # Rewrite plan + implementation status
+│   ├── future-features.md              # Deferred feature ideas (file watching, etc.)
+│   └── ios-clipboard-paste.md          # iOS clipboard/paste implementation notes
 ├── README.md
 └── AGENTS.md
+
 ```
 
 ## Tech Stack
@@ -192,7 +137,8 @@ mariposa/
 - **Validation**: Zod 3.x
 - **Image Processing**: Sharp 0.34 (WebP conversion + thumbnails)
 - **File Upload**: Multer 2.x (memory storage, 10MB limit)
-- **MCP**: `@modelcontextprotocol/sdk` 1.x (Streamable HTTP transport)
+- **YAML Parsing**: js-yaml 4.x (for `kb.yaml` files)
+- **Testing**: Vitest 3.x + supertest (87 tests)
 - **Build**: tsup (production), tsx (development with watch)
 
 ### Web (`web/`)
@@ -209,19 +155,21 @@ mariposa/
 
 ```bash
 # API - Development (hot reload)
-cd api && npm run dev      # Runs on :3020
+cd api && npm run dev        # Runs on :3020
 
 # API - Build for production
 cd api && npm run build
 
+# API - Run tests
+cd api && npm test           # 87 tests across 5 files
+cd api && npm run test:watch # Watch mode
+
 # Web - Development (hot reload)
-cd web && npm run dev      # Runs on :3021
+cd web && npm run dev        # Runs on :3021
 
 # Web - Build for production
-cd web && npm run build
+cd web && npm run build      # Includes tsc -b type check
 ```
-
-**Note**: No test framework is currently configured.
 
 ## Architecture Overview
 
@@ -229,51 +177,96 @@ cd web && npm run build
 
 ```
 Browser → Web App (React + React Flow)
-           ↕ REST API calls
-         Express API (port 3020)
+           ↕ REST API calls (proxied via Vite)
+         Express API (:3020)
            ↕ File I/O
-         Local File System
-           ├── notes/*.md           (Markdown + YAML frontmatter)
-           ├── notes/<category>/*.md (categorized notes)
-           ├── notes/.assets/images/ (WebP + thumbnails + metadata JSON)
-           ├── notes/.sections.json  (section definitions)
-           └── notes/.stickies.json  (sticky definitions)
+         KB Root Directory (user-configured)
+           ├── <kb-name>/
+           │   ├── kb.yaml              (Adjutant KB metadata)
+           │   ├── .mariposa.json       (canvas positions, sections, stickies)
+           │   ├── .mariposa/assets/    (uploaded images: WebP + thumbnails)
+           │   ├── *.md                 (note files — pure markdown)
+           │   └── <subfolder>/
+           │       ├── .mariposa.json
+           │       └── *.md
+           └── ...
+         ~/.mariposa/config.json        (app config: kbRoot path)
 ```
+
+### KB Discovery
+
+Mariposa scans the user-configured `kbRoot` directory for subdirectories containing `kb.yaml`. Each such directory is a knowledge base. The `kb.yaml` follows the Adjutant standard:
+
+```yaml
+name: "my-kb"
+description: "Description of this knowledge base"
+model: "anthropic/claude-sonnet-4-6"
+access: "read-write"
+created: "2026-01-15"
+```
+
+### .mariposa.json Sidecar
+
+Every folder within a KB can have a `.mariposa.json` file storing canvas layout metadata. This is the only metadata file Mariposa creates inside KB directories — `.md` files stay clean.
+
+```json
+{
+  "items": {
+    "filename.md": { "position": { "x": 100, "y": 200 }, "tags": ["tag"], "title": "Override Title" },
+    "subfolder": { "position": { "x": 400, "y": 100 } }
+  },
+  "sections": {
+    "section-1": { "name": "Group", "position": { "x": 0, "y": 0 }, "width": 500, "height": 400, "color": "blue", "createdAt": "...", "updatedAt": "..." }
+  },
+  "stickies": {
+    "sticky-1": { "text": "Note", "color": "yellow", "position": { "x": 0, "y": 0 }, "createdAt": "...", "updatedAt": "..." }
+  },
+  "nextSectionId": 2,
+  "nextStickyId": 2
+}
+```
+
+### Note Identity
+
+Notes are identified by filename, not slugs. `current.md` is the ID. Title is extracted from the first `# heading` in the file, falling back to filename sans extension. Mariposa-specific metadata (position, tags, title override) is stored in the parent folder's `.mariposa.json`, never in the `.md` file.
 
 ### Web App Routing
 
 | URL Pattern | View | Description |
 |-------------|------|-------------|
-| `/` | Home | Search-first landing page with animated background |
-| `/:category` | Canvas | Infinite canvas for a category space |
-| `/:category/:noteSlug` | Canvas + Editor | Canvas with note editor overlay open |
+| `/` | Home | KB browser — cards for discovered KBs + cross-KB search |
+| `/:kb` | Canvas | KB root folder canvas |
+| `/:kb/*path` | Canvas | Subfolder canvas (e.g. `/ixda/data/events`) |
+
+Note opening: Double-click a note on the canvas opens the editor overlay. Optional `?note=path` query param for shareable links.
 
 ### State Management
 
-- **URL-driven**: Current category and focused note come from React Router URL params
-- **React state**: Canvas nodes, notes, sections, stickies managed in `App.tsx` via custom hooks
+- **URL-driven**: Current KB and folder path from React Router wildcard params (`/:kb/*`)
+- **React state**: Canvas nodes, folder entries, sections, stickies managed in `App.tsx` via custom hooks
 - **localStorage**: Settings (theme, snap options), image positions on canvas
-- **Contexts**: Editor animation state, placement mode, category dialog state
+- **Server-side**: KB root path stored in `~/.mariposa/config.json` via `/api/config`
+- **Contexts**: Editor animation state (`EditorContext`), placement mode (`PlacementContext`)
 
 ### Canvas Node Types
 
 | Type | Component | Description |
 |------|-----------|-------------|
-| `note` | `NoteNode` | Note card with title + read-only TipTap markdown preview. Double-click opens editor. |
-| `image` | `ImageNode` | Image with upload/error/ready states. Corner resize handle maintains aspect ratio. |
-| `section` | `SectionNode` | Grouping rectangle with editable name label. 4-corner resize handles. Color variants. |
-| `sticky` | `StickyNode` | Colored sticky note with inline text editing. 9 color variants. |
+| `note` | `NoteNode` | Note card with title + TipTap markdown preview. Double-click opens editor. |
+| `image` | `ImageNode` | Image with upload/error/ready states. Corner resize maintains aspect ratio. |
+| `section` | `SectionNode` | Grouping rectangle with editable label. 4-corner resize handles. Color variants. |
+| `sticky` | `StickyNode` | Colored sticky with inline text editing. 9 color variants. |
 
 ### Hooks Reference
 
 | Hook | Purpose |
 |------|---------|
-| `useCanvas` | Space navigation via URL params, category CRUD |
-| `useNotes` | Note CRUD with optimistic updates, debounced position saves (300ms) |
-| `useImages` | Image upload/duplicate/delete, positions in localStorage |
-| `useSections` | Section CRUD with optimistic updates, debounced saves |
-| `useStickies` | Sticky CRUD with optimistic updates, debounced saves |
-| `useSettings` | Theme + snap settings, persisted in localStorage |
+| `useKbs` | Fetch + cache KB list from API |
+| `useCanvas` | Parse KB + folder path from URL params, navigation between folders |
+| `useFolder` | Folder entries + `.mariposa.json` CRUD, sections, stickies (replaces old useNotes/useSections/useStickies) |
+| `useNotes` | Note CRUD: create, read, update, delete, search |
+| `useImages` | KB-scoped image upload/delete, localStorage positions |
+| `useSettings` | Theme, snap settings (localStorage), kbRoot (server-side) |
 | `useCanvasHistory` | Undo/redo stack (max 50), batch operation support |
 | `useSnapToGuides` | Calculate snap alignment lines (8px threshold) |
 | `useCanvasNodeDrag` | Drag lifecycle: auto-select, snap, persist, section membership |
@@ -281,135 +274,90 @@ Browser → Web App (React + React Flow)
 | `useCanvasContextMenu` | Build context menu items for canvas and nodes |
 | `useCanvasKeyboard` | Keyboard shortcuts (Cmd+Z, Cmd+C, Delete, Escape, S, T, Enter) |
 | `useCanvasTouchGestures` | Long-press (500ms) and two-finger tap for context menus |
-| `useSidebarNotes` | Sidebar note interactions: focus on node, open editor, create note |
-| `useCategoryNotes` | Lazy-load + cache notes per category for sidebar display |
 
 ### Contexts
 
 | Context | Hook | Purpose |
 |---------|------|---------|
-| `EditorContext` | `useEditor` | Editor overlay state: animation origin rect, initial note data |
+| `EditorContext` | `useEditor` | Editor overlay state: animation origin rect, initial note data (`NoteFile`) |
 | `PlacementContext` | `usePlacement` | Placement mode: type (note/section/sticky), enter/exit actions |
-| `CategoryDialogContext` | `useCategoryDialog` | Category dialog: mode (select/create/rename/delete), target category |
 
 ## API Endpoints
+
+### Config (`/api/config`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/config` | Get current config (kbRoot path) |
+| PUT | `/api/config` | Update config (validates directory + contains KB subdirs) |
+| POST | `/api/config/browse` | Open native Finder/file manager directory picker |
+| POST | `/api/config/reveal` | Open a path in native file manager (Finder/xdg-open) |
+
+### KBs (`/api/kbs`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/kbs` | List discovered KBs (scan kbRoot for dirs with `kb.yaml`) |
+| GET | `/api/kbs/:name` | Get KB metadata (parsed from `kb.yaml`) |
+
+### Folders (`/api/folders`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/folders?kb=&path=` | List folder contents (files + subfolders) with `.mariposa.json` |
+| GET | `/api/folders/meta?kb=&path=` | Get `.mariposa.json` for a folder |
+| PUT | `/api/folders/meta?kb=&path=` | Update `.mariposa.json` for a folder |
+| POST | `/api/folders/sections?kb=&path=` | Create a section in a folder |
+| DELETE | `/api/folders/sections?kb=&path=&id=` | Delete a section |
+| POST | `/api/folders/stickies?kb=&path=` | Create a sticky in a folder |
+| DELETE | `/api/folders/stickies?kb=&path=&id=` | Delete a sticky |
 
 ### Notes (`/api/notes`)
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/notes` | List notes (optional: `?category=`, `?tags=`, `?search=`) |
-| GET | `/api/notes/:slug` | Get a single note |
-| POST | `/api/notes` | Create a note (Zod validated) |
-| PUT | `/api/notes/:slug` | Update a note (partial) |
-| DELETE | `/api/notes/:slug` | Delete a note |
-
-### Categories (`/api/categories`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/categories` | List category names |
-| GET | `/api/categories/meta` | List categories with metadata (note counts, displayNames) |
-| GET | `/api/categories/:name/meta` | Get metadata for one category |
-| PUT | `/api/categories/:name/meta` | Update category metadata (displayName) |
-| POST | `/api/categories` | Create a category |
-| DELETE | `/api/categories/:name` | Delete category (optional `?moveTo=` to migrate notes) |
-
-### Tags (`/api/tags`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/tags` | List all unique tags |
+| GET | `/api/notes?kb=&path=` | Get note content + metadata |
+| POST | `/api/notes` | Create a new note (`{ kb, folder?, title, content?, tags?, position? }`) |
+| PUT | `/api/notes?kb=&path=` | Update note content and/or metadata |
+| DELETE | `/api/notes?kb=&path=` | Delete a note + its sidecar metadata |
+| GET | `/api/notes/search?kb=&q=` | Search notes within a KB (filename + content) |
 
 ### Assets (`/api/assets`)
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/assets` | List images (optional `?category=`) |
-| GET | `/api/assets/:filename` | Serve image file (1-year cache) |
-| POST | `/api/assets/upload` | Upload image (multipart, 10MB limit) |
-| POST | `/api/assets/:id/duplicate` | Duplicate an image |
-| PATCH | `/api/assets/:id` | Update image metadata (category) |
-| DELETE | `/api/assets/:id` | Delete image + all variants |
-
-### Sections (`/api/sections`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/sections` | List sections (optional `?category=`) |
-| GET | `/api/sections/:slug` | Get a single section |
-| POST | `/api/sections` | Create a section |
-| PUT | `/api/sections/:slug` | Update a section |
-| DELETE | `/api/sections/:slug` | Delete a section |
-
-### Stickies (`/api/stickies`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/stickies` | List stickies (optional `?category=`) |
-| GET | `/api/stickies/:slug` | Get a single sticky |
-| POST | `/api/stickies` | Create a sticky |
-| PUT | `/api/stickies/:slug` | Update a sticky |
-| DELETE | `/api/stickies/:slug` | Delete a sticky |
-
-### MCP (`/mcp`)
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/mcp` | MCP JSON-RPC requests |
-| GET | `/mcp` | MCP SSE stream |
-| DELETE | `/mcp` | MCP session termination |
+| GET | `/api/assets?kb=` | List images for a KB |
+| GET | `/api/assets/:filename?kb=` | Serve image file (1-year cache) |
+| POST | `/api/assets/upload` | Upload image (multipart, 10MB, body includes `kb`) |
+| DELETE | `/api/assets/:id?kb=` | Delete image + all variants |
 
 ### Health
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
 
-## MCP Tools and Prompts
-
-### Tools (8)
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `list_notes` | `category?`, `tags?`, `search?` | List notes with optional filters |
-| `get_note` | `slug` | Get a single note by slug |
-| `create_note` | `title`, `content?`, `category?`, `tags?` | Create a new note |
-| `update_note` | `slug`, `title?`, `content?`, `category?`, `tags?` | Update an existing note |
-| `delete_note` | `slug` | Delete a note |
-| `list_categories` | — | List all categories |
-| `create_category` | `name` (regex: `[a-zA-Z0-9_-]+`) | Create a category |
-| `list_tags` | — | List all unique tags |
-
-### Prompts (4)
-| Prompt | Parameters | Description |
-|--------|-----------|-------------|
-| `display_note` | `slug` | Display a note in readable format |
-| `summarize_notes` | — | Summary of all notes, categories, and tags |
-| `create_note_helper` | `topic?` | Guide through creating a note |
-| `search_notes` | `query` | Search and present results |
-
 ## Storage Format
 
 ### Notes
-Markdown files with YAML frontmatter in `notes/` (or `notes/<category>/`):
-```yaml
----
-title: My Note
-tags:
-  - javascript
-  - react
-created: 2025-01-15T10:30:00.000Z
-modified: 2025-01-15T10:30:00.000Z
-position:
-  x: 100
-  y: 200
----
+Pure markdown files in KB directories. No YAML frontmatter — all metadata is in `.mariposa.json`:
+```markdown
+# My Note Title
 
 Note content in Markdown...
 ```
 
+Title extraction priority: `.mariposa.json` title override > first `# heading` in file > filename sans extension.
+
 ### Images
-Stored in `notes/.assets/images/`:
+Stored in `<kb>/.mariposa/assets/`:
 - `<uuid>.webp` — Full-size image (Sharp, quality 80)
 - `<uuid>-thumb.webp` — 300px-wide thumbnail (quality 75)
-- `<uuid>.meta.json` — Category metadata sidecar
 
 Accepted upload formats: JPEG, PNG, GIF, WebP, SVG, HEIC/HEIF (all converted to WebP).
 
 ### Sections & Stickies
-JSON files in the notes directory, filtered by category field.
+Stored in the folder's `.mariposa.json` under `sections` and `stickies` keys. No separate files. Auto-incrementing IDs (`section-1`, `sticky-1`, etc.).
+
+### App Configuration
+`~/.mariposa/config.json`:
+```json
+{ "kbRoot": "/path/to/knowledge-bases" }
+```
 
 ## Design System
 
@@ -420,7 +368,7 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 **Default theme**: Soft, rounded design
 - Primary: `#0066cc`, neutral background `#f5f5f5`, white cards
 - Fonts: Heading = `'Futura Classic', 'Jost', 'Nunito Sans'`, Body = `'Montserrat', system fonts`
-- Border radius: 6px–28px, box shadows for depth
+- Border radius: 6px-28px, box shadows for depth
 
 **Bauhaus theme** (`[data-theme="bauhaus"]`): Geometric, flat design
 - Primary: Red `#de1c24`, Accent Blue `#1a47a8`, Accent Yellow `#f5c623`
@@ -429,7 +377,7 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 
 ### Design Tokens (in `web/src/index.css`)
 
-**Color scales**: Blue (50–950, base `#3B67F6`), Pink (50–950, base `#F7A9F1`)
+**Color scales**: Blue (50-950, base `#3B67F6`), Pink (50-950, base `#F7A9F1`)
 
 **Typography**:
 - Font sizes: `--font-size-xxs` (11px) through `--font-size-5xl` (40px), 11 steps
@@ -447,7 +395,7 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 
 **Z-index layers**: dropdown (10), hint (99), toolbar (100), selection (150), editor (200), sidebar (201), dialog (300), context-backdrop (999), context-menu (1000), submenu (1001), max (10000)
 
-**Component sizes**: note (200×283px), ghost note (120×160px), sidebar (280px), content max-width (700px), dialog (400px), touch target (44px), toolbar circle (56px)
+**Component sizes**: note (200x283px), sidebar (280px), content max-width (700px), dialog (400px), touch target (44px), toolbar circle (56px)
 
 **Breakpoints**: mobile (480px), tablet (768px), desktop (1024px)
 
@@ -464,7 +412,7 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 
 3. **Use `import type`** for type-only imports:
    ```typescript
-   import type { Note, NoteMeta } from '../types/note.js';
+   import type { NoteFile, NoteMeta } from '../types/note.js';
    ```
 
 4. **Prefer named imports** over default imports where available
@@ -473,14 +421,14 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 
 | Element | Convention | Example |
 |---------|------------|---------|
-| Files | camelCase | `noteService.ts`, `slugGenerator.ts` |
-| Components | PascalCase files | `NoteNode.tsx`, `SearchCard.tsx` |
+| Files | camelCase | `configService.ts`, `fileNoteService.ts` |
+| Components | PascalCase files | `NoteNode.tsx`, `Sidebar.tsx` |
 | CSS Modules | ComponentName.module.css | `NoteNode.module.css` |
-| Classes | PascalCase | `NoteService` |
-| Interfaces/Types | PascalCase | `Note`, `NoteMeta`, `FrontmatterData` |
-| Zod Schemas | PascalCase + Schema | `NoteCreateSchema`, `NoteQuerySchema` |
-| Functions/Hooks | camelCase | `parseNote`, `useCanvas` |
-| Variables | camelCase | `noteService`, `filePath` |
+| Classes | PascalCase | `ConfigService`, `FileNoteService` |
+| Interfaces/Types | PascalCase | `NoteFile`, `KbMeta`, `MariposaSidecar` |
+| Zod Schemas | PascalCase + Schema | `NoteCreateSchema`, `AppConfigSchema` |
+| Functions/Hooks | camelCase | `extractTitle`, `useCanvas`, `useFolder` |
+| Variables | camelCase | `kbService`, `folderPath` |
 | CSS custom properties | `--kebab-case` | `--color-primary`, `--spacing-4` |
 | Unused parameters | Prefix with `_` | `_req`, `_res`, `_next` |
 
@@ -489,10 +437,11 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 - **Strict mode is enabled** — avoid `any` types
 - Use **interfaces for data structures**, derive types from Zod:
   ```typescript
-  export interface Note { slug: string; title: string; /* ... */ }
+  export interface NoteFile { filename: string; path: string; kb: string; /* ... */ }
   export type NoteCreateInput = z.infer<typeof NoteCreateSchema>;
   ```
 - Type assertions with `as` only when necessary
+- Node types use `id` (not `slug`) — `Section.id`, `Sticky.id`
 
 ### React Patterns
 
@@ -526,42 +475,69 @@ Two themes controlled by `data-theme` attribute on `<html>`:
 ### API Response Patterns
 
 ```typescript
-res.json({ notes, total: notes.length });  // Lists with count
+res.json({ kbs, total: kbs.length });     // Lists with count
 res.json(note);                            // Single item
 res.json({ error: 'message' });            // Errors
-res.json({ success: true, message: '' });  // Action confirmations
+res.json({ success: true });               // Action confirmations
 res.status(204).send();                    // Successful delete
 ```
 
 ### File Organization
 
-- **Services**: Single class per file, exported as singleton
+- **Services**: Single class per file, exported as singleton instance
 - **Routes**: Router pattern with default export
-- **Utils**: Pure functions, one concern per file
+- **Types**: One concern per file in `types/` directory
 - **Components**: One component per directory with `.tsx`, `.module.css`, and `index.ts`
 - **Hooks**: One hook per file in `hooks/` directory
+- **Tests**: Co-located with source files (`*.test.ts`)
 
 ### Comments
 
 - Minimal comments — code should be self-documenting
 - Section dividers for large files: `// === Section Name ===`
 - Inline comments only for non-obvious behavior
+- JSDoc on public service methods
 
 ### Git Commit Style
 
 - Lowercase, imperative mood
 - Concise descriptions
-- Examples: `add display hint...`, `fix validation error...`, `update timestamp format...`
+- Examples: `add native finder directory picker`, `fix proxy timeout for browse endpoint`, `rewrite sidebar as folder tree`
+
+## Testing
+
+Tests use Vitest and are co-located with source files. 87 tests across 5 files:
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `configService.test.ts` | 6 | Config read/write, kbRoot validation (exists, contains KBs) |
+| `kbService.test.ts` | 9 | KB discovery, hidden dir filtering, path traversal prevention |
+| `folderService.test.ts` | 15 | Folder listing, sidecar CRUD, section/sticky create/delete |
+| `fileNoteService.test.ts` | 33 | Note CRUD, title extraction, search, filename dedup, path traversal |
+| `routes.test.ts` | 24 | Integration tests for all API endpoints via supertest |
+
+Tests create temp directories with mock KB structures and clean up after each test. The API `createApp()` function is exported separately from `start()` to allow testing without binding to a port.
+
+```bash
+cd api && npm test        # Run all tests
+cd api && npm run test:watch  # Watch mode
+```
 
 ## Key Implementation Details
 
-- Notes stored as `.md` files with YAML frontmatter in `notes/` directory
-- Categories are subdirectories within `notes/`
-- Default category: `all-notes` (configurable in `api/src/config.ts`)
-- Auto-incrementing slugs: `note-1`, `note-2`, etc. (via `.counter` file)
-- Images stored as WebP in `notes/.assets/images/` with `-thumb` thumbnails and `.meta.json` sidecars
+- KBs discovered by scanning `kbRoot` for directories with `kb.yaml` (Adjutant format)
+- Notes are pure `.md` files — no YAML frontmatter, no generated slugs
+- Note identity = filename (`current.md`), canvas node ID = `note-<filename>`
+- Section/sticky identity = auto-incrementing IDs (`section-1`, `sticky-1`)
+- All canvas metadata stored in `.mariposa.json` sidecars (positions, tags, sections, stickies)
+- New notes auto-generate filenames from title via `slugify()` + dedup (`my-note.md`, `my-note-2.md`)
+- Images stored per-KB in `<kb>/.mariposa/assets/` as WebP + thumbnails
 - Image positions stored client-side in localStorage (`mariposa-image-positions` key)
+- NoteEditor has 1.5s debounced autosave, supports image paste/drop (including iOS)
+- `POST /api/config/browse` opens native Finder via AppleScript (`choose folder`)
+- `POST /api/config/reveal` opens a path in Finder via `open` command
 - API server: port 3020, host `0.0.0.0`
-- Web server: port 3021, with Vite proxy forwarding `/api` to `localhost:3020`
-- Notes dir configurable via CLI `--notes-dir` argument
+- Web server: port 3021, Vite proxy forwards `/api` to `localhost:3020`
+- Vite proxy has `timeout: 0` for `/api/config/browse` (Finder dialog needs unlimited time)
 - Vite build splits `@xyflow/react` and TipTap into separate chunks
+- `createApp()` is exported from `index.ts` for test use; server only starts when run directly
