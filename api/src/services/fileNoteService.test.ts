@@ -416,4 +416,32 @@ describe('FileNoteService', () => {
       expect(fileNoteService.extractTitle(content, 'file.md')).toBe('After Blanks');
     });
   });
+
+  describe('concurrency', () => {
+    it('creates unique filenames for 10 concurrent notes with the same title', async () => {
+      await createTestKb('test-kb');
+
+      const promises = Array.from({ length: 10 }, () =>
+        fileNoteService.create({ kb: 'test-kb', title: 'Concurrent Note', folder: '' }),
+      );
+      const results = await Promise.all(promises);
+
+      const filenames = results.filter(Boolean).map(r => r!.filename);
+      const uniqueFilenames = new Set(filenames);
+      expect(uniqueFilenames.size).toBe(10);
+    });
+
+    it('creates unique filenames for rapid sequential notes', async () => {
+      await createTestKb('test-kb');
+
+      const results = [];
+      for (let i = 0; i < 5; i++) {
+        results.push(await fileNoteService.create({ kb: 'test-kb', title: 'Rapid', folder: '' }));
+      }
+
+      const filenames = results.filter(Boolean).map(r => r!.filename);
+      const uniqueFilenames = new Set(filenames);
+      expect(uniqueFilenames.size).toBe(5);
+    });
+  });
 });

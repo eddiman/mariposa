@@ -229,6 +229,7 @@ class FileNoteService {
   /**
    * Ensure a filename is unique within a directory.
    * Appends -2, -3, etc. if needed.
+   * Uses O_EXCL flag for atomic check-and-create to prevent race conditions.
    */
   private async ensureUniqueFilename(dirPath: string, filename: string): Promise<string> {
     const ext = path.extname(filename);
@@ -237,14 +238,21 @@ class FileNoteService {
     let counter = 2;
 
     while (true) {
+      const candidatePath = path.join(dirPath, candidate);
       try {
-        await fs.access(path.join(dirPath, candidate));
-        // File exists, try next number
-        candidate = `${base}-${counter}${ext}`;
-        counter++;
-      } catch {
-        // File doesn't exist — this name is available
+        // wx = write + fail if exists (O_CREAT | O_EXCL) — atomic
+        const handle = await fs.open(candidatePath, 'wx');
+        await handle.close();
+        // We created an empty placeholder — caller will overwrite with real content
         return candidate;
+      } catch (err: unknown) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'EEXIST') {
+          candidate = `${base}-${counter}${ext}`;
+          counter++;
+        } else {
+          throw err;
+        }
       }
     }
   }

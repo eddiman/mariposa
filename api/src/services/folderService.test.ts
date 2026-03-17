@@ -244,4 +244,70 @@ describe('FolderService', () => {
       expect(meta!.stickies[stickyId]).toBeUndefined();
     });
   });
+
+  describe('sidecar backups', () => {
+    it('creates a backup on write', async () => {
+      const kbDir = await createTestKb('test-kb');
+
+      // First write — creates sidecar, no backup yet
+      await folderService.updateMeta('test-kb', '', {
+        items: { 'a.md': { position: { x: 1, y: 1 } } },
+      });
+
+      // Second write — should create a backup of the first version
+      await folderService.updateMeta('test-kb', '', {
+        items: { 'b.md': { position: { x: 2, y: 2 } } },
+      });
+
+      const files = await fs.readdir(kbDir);
+      const backups = files.filter(f => f.startsWith('.mariposa.json.backup-'));
+      expect(backups.length).toBe(1);
+    });
+
+    it('keeps only the last 3 backups', async () => {
+      const kbDir = await createTestKb('test-kb');
+
+      // Make 6 writes — should result in 3 backups (the most recent)
+      for (let i = 0; i < 6; i++) {
+        await folderService.updateMeta('test-kb', '', {
+          items: { [`note-${i}.md`]: { position: { x: i, y: i } } },
+        });
+        // Tiny delay so timestamps differ
+        await new Promise(r => setTimeout(r, 5));
+      }
+
+      const files = await fs.readdir(kbDir);
+      const backups = files.filter(f => f.startsWith('.mariposa.json.backup-'));
+      expect(backups.length).toBe(3);
+    });
+  });
+
+  describe('images', () => {
+    it('stores and retrieves image position', async () => {
+      await createTestKb('test-kb');
+
+      const updated = await folderService.updateImagePosition('test-kb', '', 'img-123', { x: 50, y: 100 }, 400, 300);
+      expect(updated).toBe(true);
+
+      const imageMeta = await folderService.getImagePosition('test-kb', '', 'img-123');
+      expect(imageMeta).toEqual({ position: { x: 50, y: 100 }, width: 400, height: 300 });
+    });
+
+    it('deletes image position', async () => {
+      await createTestKb('test-kb');
+
+      await folderService.updateImagePosition('test-kb', '', 'img-456', { x: 10, y: 20 });
+      const deleted = await folderService.deleteImagePosition('test-kb', '', 'img-456');
+      expect(deleted).toBe(true);
+
+      const imageMeta = await folderService.getImagePosition('test-kb', '', 'img-456');
+      expect(imageMeta).toBeNull();
+    });
+
+    it('returns false when deleting nonexistent image position', async () => {
+      await createTestKb('test-kb');
+      const deleted = await folderService.deleteImagePosition('test-kb', '', 'nonexistent');
+      expect(deleted).toBe(false);
+    });
+  });
 });

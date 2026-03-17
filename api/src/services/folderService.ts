@@ -271,7 +271,30 @@ class FolderService {
 
   private async writeSidecar(absPath: string, data: MariposaSidecar): Promise<void> {
     const sidecarPath = path.join(absPath, SIDECAR_FILENAME);
-    await fs.writeFile(sidecarPath, JSON.stringify(data, null, 2), 'utf-8');
+
+    // Backup existing sidecar before overwriting (keep last 3)
+    try {
+      await fs.access(sidecarPath);
+      const backupName = `.mariposa.json.backup-${Date.now()}`;
+      await fs.copyFile(sidecarPath, path.join(absPath, backupName));
+
+      const files = await fs.readdir(absPath);
+      const backups = files
+        .filter(f => f.startsWith('.mariposa.json.backup-'))
+        .sort()
+        .reverse();
+
+      for (const old of backups.slice(3)) {
+        await fs.unlink(path.join(absPath, old)).catch(() => {});
+      }
+    } catch {
+      // No existing sidecar to back up — first write
+    }
+
+    // Atomic-ish write: write to unique temp, then rename
+    const tmpPath = sidecarPath + `.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.rename(tmpPath, sidecarPath);
   }
 }
 
