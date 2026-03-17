@@ -102,22 +102,33 @@ router.post('/kb/query', async (req: Request, res: Response) => {
     const proc = spawn(adjutantBin, ['kb', 'query', kbName, question], {
       cwd: adjDir,
       env: { ...process.env, ADJ_DIR: adjDir },
-      timeout: 60_000,
     });
 
     let stdout = '';
     let stderr = '';
+    let responded = false;
+
+    // 60-second timeout (spawn doesn't support timeout option)
+    const killTimer = setTimeout(() => {
+      proc.kill();
+    }, 60_000);
 
     proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
     proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
 
     proc.on('error', (error) => {
+      clearTimeout(killTimer);
+      if (responded) return;
+      responded = true;
       console.error('KB query process error:', error);
       res.status(500).json({ error: 'Failed to execute KB query' });
     });
 
     proc.on('exit', (code) => {
-      if (code === 0) {
+      clearTimeout(killTimer);
+      if (responded) return;
+      responded = true;
+      if (code === 0 || code === null) {
         res.json({
           answer: stdout.trim(),
           kb: kbName,
