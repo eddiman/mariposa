@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { configService } from '../services/configService.js';
 
 const router = Router();
@@ -85,25 +85,36 @@ router.post('/reveal', async (req: Request, res: Response) => {
     }
 
     const platform = process.platform;
-    let cmd: string;
+    let command: string;
+    let args: string[];
 
     if (platform === 'darwin') {
-      cmd = `open "${targetPath.replace(/"/g, '\\"')}"`;
+      command = 'open';
+      args = [targetPath];
     } else if (platform === 'linux') {
-      cmd = `xdg-open "${targetPath.replace(/"/g, '\\"')}"`;
+      command = 'xdg-open';
+      args = [targetPath];
     } else if (platform === 'win32') {
-      cmd = `explorer "${targetPath.replace(/"/g, '\\"')}"`;
+      command = 'explorer';
+      args = [targetPath];
     } else {
       res.status(501).json({ error: 'Not supported on this platform' });
       return;
     }
 
-    exec(cmd, { timeout: 5000 }, (error) => {
-      if (error) {
+    const proc = spawn(command, args, { timeout: 5000 });
+
+    proc.on('error', (error) => {
+      console.error('Failed to open in file manager:', error);
+      res.status(500).json({ error: 'Failed to open in file manager' });
+    });
+
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        res.json({ success: true });
+      } else {
         res.status(500).json({ error: 'Failed to open in file manager' });
-        return;
       }
-      res.json({ success: true });
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to reveal path' });

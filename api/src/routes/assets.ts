@@ -1,9 +1,18 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { imageService } from '../services/imageService.js';
 import type { ImageMetadata } from '../services/imageService.js';
 
 const router = Router();
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 uploads per 15 minutes
+  message: 'Too many upload requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,7 +28,7 @@ const upload = multer({
 });
 
 // POST /api/assets/upload — Upload an image (requires kb in body)
-router.post('/upload', upload.single('image'), async (req, res) => {
+router.post('/upload', uploadLimiter, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No image file provided' });
