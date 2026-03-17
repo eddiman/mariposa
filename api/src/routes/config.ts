@@ -37,8 +37,10 @@ router.post('/browse', async (_req: Request, res: Response) => {
       // macOS: use AppleScript to open Finder folder picker
       const script = `osascript -e 'try' -e 'set chosenFolder to POSIX path of (choose folder with prompt "Select KB root directory")' -e 'return chosenFolder' -e 'on error' -e 'return ""' -e 'end try'`;
 
-      exec(script, { timeout: 120000 }, (error, stdout) => {
+      exec(script, { timeout: 0 }, (error, stdout, stderr) => {
+        if (stderr) console.error('osascript stderr:', stderr);
         if (error) {
+          console.error('osascript error:', error.message);
           res.json({ path: null, cancelled: true });
           return;
         }
@@ -53,7 +55,7 @@ router.post('/browse', async (_req: Request, res: Response) => {
       });
     } else if (platform === 'linux') {
       // Linux: try zenity
-      exec('zenity --file-selection --directory --title="Select KB root directory"', { timeout: 120000 }, (error, stdout) => {
+      exec('zenity --file-selection --directory --title="Select KB root directory"', { timeout: 0 }, (error, stdout) => {
         if (error) {
           res.json({ path: null, cancelled: true });
           return;

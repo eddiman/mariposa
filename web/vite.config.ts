@@ -9,6 +9,12 @@ export default defineConfig({
     port: 3021,
     host: true,
     proxy: {
+      '/api/config/browse': {
+        target: 'http://localhost:3020',
+        changeOrigin: true,
+        timeout: 0,        // No socket timeout
+        proxyTimeout: 0,   // No proxy timeout — user needs time in Finder
+      },
       '/api': {
         target: 'http://localhost:3020',
         changeOrigin: true,
