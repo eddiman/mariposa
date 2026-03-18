@@ -18,6 +18,7 @@ import { useFolder } from './hooks/useFolder';
 import { useNotes } from './hooks/useNotes';
 import { useImages } from './hooks/useImages';
 import { useSettings } from './hooks/useSettings';
+import { useAdjutant } from './hooks/useAdjutant';
 import { EditorProvider, useEditor, PlacementProvider, usePlacement } from './contexts';
 import type { Position, StickyColor, NoteFile } from './types';
 
@@ -37,6 +38,7 @@ function AppContent() {
   const { kbs, loading: loadingKbs, refetch: refetchKbs } = useKbs();
   const { settings, updateSetting } = useSettings();
   const { getNote, createNote, updateNote, deleteNote, searchNotes, searching } = useNotes();
+  const adjutantData = useAdjutant();
 
   // Apply theme
   useEffect(() => {
@@ -291,7 +293,7 @@ function AppContent() {
       />
 
       {isAdjutantPage ? (
-        <AdjutantDashboard sidebarOpen={sidebarOpen} />
+        <AdjutantDashboard sidebarOpen={sidebarOpen} data={adjutantData} />
       ) : (
       <main className={`app-main full ${isPlacementMode ? 'placement-mode' : ''}`}>
         {!isOnCanvas ? (
