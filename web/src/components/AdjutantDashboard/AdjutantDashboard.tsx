@@ -4,6 +4,7 @@ import { IdentityDisplay } from './IdentityDisplay';
 import { QuickActions } from './QuickActions';
 import { HealthChecks } from './HealthChecks';
 import { ActivityFeed } from './ActivityFeed';
+import { LastPulse } from './LastPulse';
 import { AnimatedBackground } from '../Home/AnimatedBackground';
 import type { AdjutantData } from '../../hooks/useAdjutant';
 import styles from './AdjutantDashboard.module.css';
@@ -83,6 +84,7 @@ export function AdjutantDashboard({ sidebarOpen = false, data }: AdjutantDashboa
             actionStates={actionStates}
             onAction={runLifecycleAction}
           />
+          <LastPulse heartbeat={status.lastHeartbeat} />
           <HealthChecks health={health} onRefresh={fetchHealth} />
           <SchedulesManager
             schedules={schedules}
