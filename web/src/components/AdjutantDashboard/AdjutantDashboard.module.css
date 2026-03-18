@@ -1,9 +1,9 @@
 .dashboard {
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
   overflow-y: auto;
   background: var(--color-background);
+  z-index: 1;
 }
 
 .content {

@@ -45,6 +45,10 @@ class RegistryService {
    * 2. ADJ_DIR env var (set by Adjutant core/paths.py at runtime)
    * 3. ~/.adjutant (default fallback)
    *
+   * A candidate is valid if it contains either:
+   * - knowledge_bases/registry.yaml (KB registry)
+   * - adjutant.yaml (Adjutant config)
+   *
    * Returns null if none exist.
    */
   async resolveAdjutantDir(): Promise<string | null> {
@@ -57,13 +61,20 @@ class RegistryService {
     ].filter(Boolean) as string[];
 
     for (const candidate of candidates) {
-      try {
-        const registryPath = path.join(candidate, 'knowledge_bases', 'registry.yaml');
-        await fs.access(registryPath);
-        this.adjutantDir = candidate;
-        return candidate;
-      } catch {
-        // Not found, try next
+      // Check for registry.yaml (KB registry) OR adjutant.yaml (config)
+      const probes = [
+        path.join(candidate, 'knowledge_bases', 'registry.yaml'),
+        path.join(candidate, 'adjutant.yaml'),
+      ];
+
+      for (const probe of probes) {
+        try {
+          await fs.access(probe);
+          this.adjutantDir = candidate;
+          return candidate;
+        } catch {
+          // Not found, try next probe
+        }
       }
     }
 
