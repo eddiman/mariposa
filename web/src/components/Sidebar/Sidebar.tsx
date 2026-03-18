@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { isMobileViewport } from '../../utils/platform.js';
 import type { KbMeta, FolderEntry, MariposaSidecar } from '../../types';
 import styles from './Sidebar.module.css';
@@ -33,6 +34,9 @@ export function Sidebar({
   onNavigateToFolder,
   loading = false,
 }: SidebarProps) {
+  const location = useLocation();
+  const isAdjutantPage = location.pathname === '/adjutant';
+
   // Sync expanded state with currentKb
   useEffect(() => {
     // Future: could expand/collapse KB sections here
@@ -110,7 +114,7 @@ export function Sidebar({
         <nav className={styles['sidebar-nav']}>
           {/* Home link */}
           <button
-            className={`${styles['sidebar-item']} ${!currentKb ? styles.active : ''}`}
+            className={`${styles['sidebar-item']} ${!currentKb && !isAdjutantPage ? styles.active : ''}`}
             onClick={handleHomeClick}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -119,6 +123,19 @@ export function Sidebar({
             </svg>
             <span className={styles['sidebar-item-text']}>Home</span>
           </button>
+
+          {/* Adjutant Dashboard link */}
+          <Link
+            to="/adjutant"
+            className={`${styles['sidebar-item']} ${isAdjutantPage ? styles.active : ''}`}
+            onClick={() => { if (isMobileViewport() && open) onToggle(); }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v6m0 6v6m8.66-15L17 7.5M7 16.5l-3.66 4.5M1 12h6m6 0h6m-2.66-8L13 7.5M7 16.5l3.66-4.5"/>
+            </svg>
+            <span className={styles['sidebar-item-text']}>Adjutant</span>
+          </Link>
 
           {/* KB list */}
           {kbs.map(kb => (

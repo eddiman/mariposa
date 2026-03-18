@@ -7,6 +7,7 @@ import { GhostSection } from './components/GhostSection';
 import { GhostSticky } from './components/GhostSticky';
 import { PlacementHint } from './components/PlacementHint';
 import { Canvas } from './components/Canvas';
+import { AdjutantDashboard } from './components/AdjutantDashboard';
 
 const NoteEditor = lazy(() => import('./components/NoteEditor/NoteEditor'));
 const SettingsDialog = lazy(() => import('./components/SettingsDialog/SettingsDialog'));
@@ -405,6 +406,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<AppWithProviders />} />
+      <Route path="/adjutant" element={<AdjutantDashboard />} />
       <Route path="/:kb" element={<AppWithProviders />} />
       <Route path="/:kb/*" element={<AppWithProviders />} />
     </Routes>
