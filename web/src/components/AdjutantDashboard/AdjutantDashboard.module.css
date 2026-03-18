@@ -4,6 +4,20 @@
   overflow-y: auto;
   background: var(--color-background);
   z-index: 1;
+  transition: left var(--transition-medium);
+}
+
+/* Shift everything right when sidebar is open */
+.sidebarOpen {
+  left: var(--sidebar-width);
+}
+
+/* Pin the animated background to the viewport so it doesn't
+   clip at the first screenful when the dashboard scrolls. */
+.dashboard > :global([class*="background"]) {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
 }
 
 .content {

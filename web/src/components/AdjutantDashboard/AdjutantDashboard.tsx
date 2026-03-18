@@ -41,7 +41,11 @@ interface HealthStatus {
   };
 }
 
-export function AdjutantDashboard() {
+interface AdjutantDashboardProps {
+  sidebarOpen?: boolean;
+}
+
+export function AdjutantDashboard({ sidebarOpen = false }: AdjutantDashboardProps) {
   const [status, setStatus] = useState<AdjutantStatus | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -177,9 +181,11 @@ export function AdjutantDashboard() {
     }
   };
 
+  const dashboardClass = `${styles.dashboard} ${sidebarOpen ? styles.sidebarOpen : ''}`;
+
   if (loading) {
     return (
-      <div className={styles.dashboard}>
+      <div className={dashboardClass}>
         <AnimatedBackground />
         <div className={styles.content}>
           <h1 className={styles.title}>Adjutant Dashboard</h1>
@@ -191,7 +197,7 @@ export function AdjutantDashboard() {
 
   if (error || !status || !status.available) {
     return (
-      <div className={styles.dashboard}>
+      <div className={dashboardClass}>
         <AnimatedBackground />
         <div className={styles.content}>
           <h1 className={styles.title}>Adjutant Dashboard</h1>
@@ -207,7 +213,7 @@ export function AdjutantDashboard() {
   }
 
   return (
-    <div className={styles.dashboard}>
+    <div className={dashboardClass}>
       <AnimatedBackground />
       <div className={styles.content}>
         <header className={styles.header}>

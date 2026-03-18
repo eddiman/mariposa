@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Home } from './components/Home';
 import { Sidebar } from './components/Sidebar';
 import { Toolbar } from './components/Toolbar';
@@ -22,6 +22,9 @@ import { EditorProvider, useEditor, PlacementProvider, usePlacement } from './co
 import type { Position, StickyColor, NoteFile } from './types';
 
 function AppContent() {
+  const location = useLocation();
+  const isAdjutantPage = location.pathname === '/adjutant';
+
   const {
     currentKb,
     currentPath,
@@ -261,7 +264,7 @@ function AppContent() {
     }, 100);
   }, [navigateToFolder, setFocusedNote]);
 
-  const isOnCanvas = currentKb !== null;
+  const isOnCanvas = currentKb !== null && !isAdjutantPage;
 
   return (
     <div className="app">
@@ -287,6 +290,9 @@ function AppContent() {
         loading={loadingKbs}
       />
 
+      {isAdjutantPage ? (
+        <AdjutantDashboard sidebarOpen={sidebarOpen} />
+      ) : (
       <main className={`app-main full ${isPlacementMode ? 'placement-mode' : ''}`}>
         {!isOnCanvas ? (
           <Home
@@ -346,6 +352,7 @@ function AppContent() {
           />
         )}
       </main>
+      )}
 
       {isOnCanvas && (
         <>
@@ -406,7 +413,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<AppWithProviders />} />
-      <Route path="/adjutant" element={<AdjutantDashboard />} />
+      <Route path="/adjutant" element={<AppWithProviders />} />
       <Route path="/:kb" element={<AppWithProviders />} />
       <Route path="/:kb/*" element={<AppWithProviders />} />
     </Routes>
