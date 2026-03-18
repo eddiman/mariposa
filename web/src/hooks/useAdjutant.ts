@@ -3,11 +3,30 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export type LifecycleAction = 'pause' | 'resume' | 'pulse' | 'review';
 export type ActionState = 'idle' | 'running' | 'success' | 'error';
 
+interface ActiveOperation {
+  action: string;
+  started_at: string;
+  pid: number;
+  source: string;
+}
+
+interface LastHeartbeat {
+  type: string;
+  timestamp: string;
+  kbs_checked: string[];
+  issues_found?: string[];
+  insights_sent?: number;
+  recommendations?: string[];
+  escalated?: boolean;
+}
+
 export interface AdjutantStatus {
   mode: 'adjutant' | 'standalone';
   available: boolean;
   adjutantDir?: string;
   lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED';
+  activeOperation?: ActiveOperation | null;
+  lastHeartbeat?: LastHeartbeat | null;
 }
 
 export interface Schedule {
@@ -53,10 +72,19 @@ export interface AdjutantData {
   runLifecycleAction: (action: LifecycleAction) => Promise<void>;
 }
 
+/** Polling interval when idle (ms). */
+const POLL_IDLE_MS = 10_000;
+/** Polling interval when an operation is active (ms). */
+const POLL_ACTIVE_MS = 3_000;
+/** How long to show the "Done" state after an operation completes (ms). */
+const SUCCESS_DISPLAY_MS = 4_000;
+
 /**
  * Persistent hook for Adjutant dashboard data.
+ *
  * Lives in AppContent so state survives route changes.
- * Fetches once on first mount, then only on explicit actions.
+ * Fetches once on first mount, then polls /status to track active operations.
+ * Button states are derived from Adjutant's filesystem state, not in-memory.
  */
 export function useAdjutant(): AdjutantData {
   const [status, setStatus] = useState<AdjutantStatus | null>(null);
@@ -66,20 +94,48 @@ export function useAdjutant(): AdjutantData {
   const [journalEntries, setJournalEntries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionStates, setActionStates] = useState<Record<LifecycleAction, ActionState>>({
-    pause: 'idle',
-    resume: 'idle',
-    pulse: 'idle',
-    review: 'idle',
-  });
+
+  // Track which actions recently completed — for brief "Done" display
+  const [recentlyCompleted, setRecentlyCompleted] = useState<Partial<Record<LifecycleAction, true>>>({});
+  // Track which actions failed to trigger (HTTP POST failed)
+  const [triggerErrors, setTriggerErrors] = useState<Partial<Record<LifecycleAction, true>>>({});
+
   const fetched = useRef(false);
-  const timeoutRefs = useRef<Record<string, number>>({});
+  const pollRef = useRef<number | null>(null);
+  const successTimers = useRef<Record<string, number>>({});
+  // Track what was active on last poll to detect transitions
+  const prevActiveAction = useRef<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/adjutant/status');
       if (!res.ok) throw new Error('Failed to fetch status');
-      const data = await res.json();
+      const data: AdjutantStatus = await res.json();
+
+      // Detect operation completion: was active, now not
+      const currentActive = data.activeOperation?.action ?? null;
+      const prevActive = prevActiveAction.current;
+
+      if (prevActive && !currentActive) {
+        // Operation just completed — show "Done" briefly
+        const completed = prevActive as LifecycleAction;
+        setRecentlyCompleted(prev => ({ ...prev, [completed]: true }));
+
+        // Clear the success display after a few seconds
+        if (successTimers.current[completed]) {
+          clearTimeout(successTimers.current[completed]);
+        }
+        successTimers.current[completed] = window.setTimeout(() => {
+          setRecentlyCompleted(prev => {
+            const next = { ...prev };
+            delete next[completed];
+            return next;
+          });
+          delete successTimers.current[completed];
+        }, SUCCESS_DISPLAY_MS);
+      }
+
+      prevActiveAction.current = currentActive;
       setStatus(data);
     } catch (err) {
       console.error('Failed to fetch status:', err);
@@ -131,7 +187,7 @@ export function useAdjutant(): AdjutantData {
     }
   }, []);
 
-  // Fetch once on first mount
+  // Fetch everything once on first mount
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
@@ -151,6 +207,37 @@ export function useAdjutant(): AdjutantData {
 
     fetchAll();
   }, [fetchStatus, fetchSchedules, fetchIdentity, fetchHealth, fetchJournal]);
+
+  // Poll /status — faster when an operation is active
+  useEffect(() => {
+    const isActive = !!status?.activeOperation;
+    const interval = isActive ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+
+    // Clear previous interval
+    if (pollRef.current !== null) {
+      clearInterval(pollRef.current);
+    }
+
+    pollRef.current = window.setInterval(() => {
+      fetchStatus();
+    }, interval);
+
+    return () => {
+      if (pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [status?.activeOperation, fetchStatus]);
+
+  // Cleanup success timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of Object.values(successTimers.current)) {
+        clearTimeout(timer);
+      }
+    };
+  }, []);
 
   const handleScheduleToggle = useCallback(async (name: string, enabled: boolean) => {
     const res = await fetch('/api/adjutant/schedules/toggle', {
@@ -172,17 +259,12 @@ export function useAdjutant(): AdjutantData {
   }, []);
 
   const runLifecycleAction = useCallback(async (action: LifecycleAction) => {
-    // Guard: don't run if already running
-    if (actionStates[action] === 'running') return;
-
-    // Clear any pending timeout for this action
-    if (timeoutRefs.current[action]) {
-      clearTimeout(timeoutRefs.current[action]);
-      delete timeoutRefs.current[action];
-    }
-
-    // Set running state
-    setActionStates(prev => ({ ...prev, [action]: 'running' }));
+    // Clear any previous error for this action
+    setTriggerErrors(prev => {
+      const next = { ...prev };
+      delete next[action];
+      return next;
+    });
 
     try {
       const res = await fetch('/api/adjutant/lifecycle', {
@@ -192,32 +274,50 @@ export function useAdjutant(): AdjutantData {
       });
       if (!res.ok) throw new Error(`Failed to ${action}`);
 
-      // Refresh status after lifecycle action (e.g. pause → PAUSED)
+      // For pause/resume: refresh status immediately (they're synchronous)
+      // For pulse/review: poll will pick up the active_operation marker
       await fetchStatus();
-
-      // Set success state
-      setActionStates(prev => ({ ...prev, [action]: 'success' }));
-
-      // Auto-reset to idle after 3s
-      timeoutRefs.current[action] = setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
-        delete timeoutRefs.current[action];
-      }, 3000);
     } catch (err) {
       console.error(`Lifecycle action ${action} failed:`, err);
+      setTriggerErrors(prev => ({ ...prev, [action]: true }));
 
-      // Set error state
-      setActionStates(prev => ({ ...prev, [action]: 'error' }));
-
-      // Auto-reset to idle after 4s
-      timeoutRefs.current[action] = setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
-        delete timeoutRefs.current[action];
+      // Auto-clear error after 4s
+      window.setTimeout(() => {
+        setTriggerErrors(prev => {
+          const next = { ...prev };
+          delete next[action];
+          return next;
+        });
       }, 4000);
-
-      throw err;
     }
-  }, [actionStates, fetchStatus]);
+  }, [fetchStatus]);
+
+  // Derive actionStates from Adjutant's reported state
+  const actionStates: Record<LifecycleAction, ActionState> = {
+    pause: 'idle',
+    resume: 'idle',
+    pulse: 'idle',
+    review: 'idle',
+  };
+
+  const activeAction = status?.activeOperation?.action;
+  if (activeAction && activeAction in actionStates) {
+    actionStates[activeAction as LifecycleAction] = 'running';
+  }
+
+  // Override with recently-completed (brief "Done" display)
+  for (const action of Object.keys(recentlyCompleted) as LifecycleAction[]) {
+    if (actionStates[action] !== 'running') {
+      actionStates[action] = 'success';
+    }
+  }
+
+  // Override with trigger errors
+  for (const action of Object.keys(triggerErrors) as LifecycleAction[]) {
+    if (actionStates[action] === 'idle') {
+      actionStates[action] = 'error';
+    }
+  }
 
   return {
     status,

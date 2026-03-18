@@ -38,15 +38,54 @@ router.get('/status', async (_req: Request, res: Response) => {
 
       // Read lifecycle state from filesystem markers
       try {
-        await fs.access(path.join(adjDir, 'state', 'KILLED'));
+        await fs.access(path.join(adjDir, 'KILLED'));
         result.lifecycleState = 'KILLED';
       } catch {
         try {
-          await fs.access(path.join(adjDir, 'state', 'PAUSED'));
+          await fs.access(path.join(adjDir, 'PAUSED'));
           result.lifecycleState = 'PAUSED';
         } catch {
           result.lifecycleState = 'OPERATIONAL';
         }
+      }
+
+      // Active operation (running pulse/review)
+      try {
+        const opFile = path.join(adjDir, 'state', 'active_operation.json');
+        const opRaw = await fs.readFile(opFile, 'utf-8');
+        const opData = JSON.parse(opRaw);
+
+        // Staleness check: >30 min and PID is dead
+        const startedAt = new Date(opData.started_at);
+        const ageMs = Date.now() - startedAt.getTime();
+        if (ageMs > 30 * 60 * 1000) {
+          let pidAlive = false;
+          try {
+            process.kill(opData.pid, 0);
+            pidAlive = true;
+          } catch {
+            // PID is dead
+          }
+          if (!pidAlive) {
+            // Stale marker — clean up and ignore
+            await fs.unlink(opFile).catch(() => {});
+          } else {
+            result.activeOperation = opData;
+          }
+        } else {
+          result.activeOperation = opData;
+        }
+      } catch {
+        // No active operation file — normal state
+      }
+
+      // Last heartbeat
+      try {
+        const hbFile = path.join(adjDir, 'state', 'last_heartbeat.json');
+        const hbRaw = await fs.readFile(hbFile, 'utf-8');
+        result.lastHeartbeat = JSON.parse(hbRaw);
+      } catch {
+        // No heartbeat data yet
       }
     }
 
@@ -419,9 +458,13 @@ router.get('/health', async (_req: Request, res: Response) => {
 });
 
 /**
- * POST /api/adjutant/lifecycle — Control Adjutant lifecycle (pause/resume).
+ * POST /api/adjutant/lifecycle — Control Adjutant lifecycle.
  *
  * Body: { action: 'pause' | 'resume' | 'pulse' | 'review' }
+ *
+ * pause/resume are instant — waits for completion.
+ * pulse/review are long-running — fires detached and returns immediately.
+ * Adjutant writes state/active_operation.json so clients can poll status.
  */
 router.post('/lifecycle', async (req: Request, res: Response) => {
   try {
@@ -439,33 +482,47 @@ router.post('/lifecycle', async (req: Request, res: Response) => {
     }
 
     const adjutantBin = path.join(adjDir, 'adjutant');
-    
-    const proc = spawn(adjutantBin, [action], {
-      cwd: adjDir,
-      env: { ...process.env, ADJ_DIR: adjDir },
-    });
 
-    let stdout = '';
-    let stderr = '';
+    if (action === 'pulse' || action === 'review') {
+      // Fire-and-forget — Adjutant tracks its own running state via
+      // state/active_operation.json.  The client polls GET /status.
+      const proc = spawn(adjutantBin, [action], {
+        cwd: adjDir,
+        env: { ...process.env, ADJ_DIR: adjDir },
+        detached: true,
+        stdio: 'ignore',
+      });
+      proc.unref();
+      res.json({ success: true, action, message: `${action} triggered` });
+    } else {
+      // pause/resume are instant — wait for result
+      const proc = spawn(adjutantBin, [action], {
+        cwd: adjDir,
+        env: { ...process.env, ADJ_DIR: adjDir },
+      });
 
-    proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
-    proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+      let stdout = '';
+      let stderr = '';
 
-    proc.on('exit', (code) => {
-      if (code === 0 || code === null) {
-        res.json({ 
-          success: true, 
-          action,
-          output: stdout.trim(),
-        });
-      } else {
-        console.error('Lifecycle action failed:', stderr);
-        res.status(500).json({
-          error: `Failed to ${action}`,
-          details: stderr.trim(),
-        });
-      }
-    });
+      proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+      proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+      proc.on('exit', (code) => {
+        if (code === 0 || code === null) {
+          res.json({
+            success: true,
+            action,
+            output: stdout.trim(),
+          });
+        } else {
+          console.error('Lifecycle action failed:', stderr);
+          res.status(500).json({
+            error: `Failed to ${action}`,
+            details: stderr.trim(),
+          });
+        }
+      });
+    }
   } catch (error) {
     console.error('Lifecycle action error:', error);
     res.status(500).json({ error: 'Failed to execute lifecycle action' });
