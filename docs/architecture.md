@@ -312,6 +312,78 @@ Recursive folder tree showing the KB structure. Expandable folders show subfolde
 - Mariposa writes `.md` files (note create/edit), `.mariposa.json` sidecars (canvas metadata), and `.mariposa/assets/` (uploaded images)
 - Path traversal protection on all file operations (KB and path params validated)
 
+## Adjutant Integration
+
+Mariposa includes an optional Adjutant agent dashboard at `/adjutant`. This provides a web UI for monitoring and controlling the Adjutant framework.
+
+### How It Works
+
+```
+Mariposa Dashboard (browser)
+  ↕ REST API calls
+Mariposa API (Express)
+  ↕ File I/O + subprocess spawn
+Adjutant directory ($ADJ_DIR)
+  ├── adjutant.yaml          → schedules, config
+  ├── PAUSED / KILLED         → lifecycle state
+  ├── state/
+  │   ├── active_operation.json  → running pulse/review
+  │   ├── last_heartbeat.json    → last pulse results
+  │   └── adjutant.log           → journal entries
+  └── identity/               → soul, heart, registry
+```
+
+### Directory Detection
+
+`registryService.resolveAdjutantDir()` finds the Adjutant directory by checking:
+1. `ADJUTANT_DIR` environment variable
+2. `~/.adjutant` directory
+
+A directory is valid if it contains `adjutant.yaml` or `knowledge_bases/registry.yaml`.
+
+### API Endpoints (`/api/adjutant/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/status` | GET | Lifecycle state, active operation, last heartbeat |
+| `/schedules` | GET | List scheduled jobs from `adjutant.yaml` |
+| `/schedules/toggle` | POST | Enable/disable a schedule |
+| `/schedules/run` | POST | Trigger a schedule (fire-and-forget) |
+| `/identity` | GET | Soul, heart, registry excerpts |
+| `/journal/recent` | GET | Last 20 log entries |
+| `/health` | GET | Directory, config, CLI health checks |
+| `/lifecycle` | POST | Pause, resume, pulse, review |
+| `/kb/query` | POST | Query a KB via Adjutant sub-agent |
+
+### Lifecycle Actions
+
+**Pause/resume** are synchronous — the API waits for the `adjutant` CLI to complete and returns the result.
+
+**Pulse/review** are fire-and-forget — the API spawns `adjutant pulse` as a detached process and returns immediately. Adjutant writes `state/active_operation.json` while running. The dashboard polls `/api/adjutant/status` every 3 seconds during an active operation to observe progress. No idle polling occurs.
+
+### Dashboard Components
+
+| Component | Data Source | Purpose |
+|-----------|------------|---------|
+| `SystemStatus` | `/status` | Mode, lifecycle state, directory |
+| `QuickActions` | `/status` → `activeOperation` | Trigger and observe pulse/review/pause/resume |
+| `LastPulse` | `/status` → `lastHeartbeat` | Show results from the last pulse or review |
+| `HealthChecks` | `/health` | Directory, config, CLI validation |
+| `SchedulesManager` | `/schedules` | View, toggle, and trigger scheduled jobs |
+| `IdentityDisplay` | `/identity` | Tabbed view of soul, heart, registry |
+| `ActivityFeed` | `/journal/recent` | Recent log entries |
+
+### State Management (`useAdjutant` hook)
+
+All dashboard state lives in the `useAdjutant()` hook, which is instantiated in `AppContent` (never unmounts). This means dashboard state survives navigation — visit a KB, come back, and the dashboard still shows the same data.
+
+Button states (running/done/error) are derived from Adjutant's filesystem state, not in-memory tracking:
+- `status.activeOperation?.action === 'pulse'` → Pulse button shows "Running..."
+- No active operation + heartbeat timestamp changed → "Done" for 4 seconds
+- HTTP POST failure → "Failed" for 4 seconds
+
+---
+
 ## Development Setup
 
 ### Proxy Configuration
