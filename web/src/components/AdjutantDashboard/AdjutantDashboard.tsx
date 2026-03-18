@@ -14,6 +14,9 @@ interface AdjutantDashboardProps {
 }
 
 export function AdjutantDashboard({ sidebarOpen = false, data }: AdjutantDashboardProps) {
+  // Guard for HMR / undefined race conditions
+  if (!data) return null;
+
   const {
     status,
     schedules,
@@ -25,7 +28,8 @@ export function AdjutantDashboard({ sidebarOpen = false, data }: AdjutantDashboa
     fetchHealth,
     handleScheduleToggle,
     handleScheduleRun,
-    handleLifecycleAction,
+    actionStates,
+    runLifecycleAction,
   } = data;
 
   const dashboardClass = `${styles.dashboard} ${sidebarOpen ? styles.sidebarOpen : ''}`;
@@ -76,7 +80,8 @@ export function AdjutantDashboard({ sidebarOpen = false, data }: AdjutantDashboa
           <SystemStatus status={status} />
           <QuickActions
             lifecycleState={status.lifecycleState}
-            onAction={handleLifecycleAction}
+            actionStates={actionStates}
+            onAction={runLifecycleAction}
           />
           <HealthChecks health={health} onRefresh={fetchHealth} />
           <SchedulesManager

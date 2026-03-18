@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export type LifecycleAction = 'pause' | 'resume' | 'pulse' | 'review';
+export type ActionState = 'idle' | 'running' | 'success' | 'error';
+
 export interface AdjutantStatus {
   mode: 'adjutant' | 'standalone';
   available: boolean;
@@ -41,12 +44,13 @@ export interface AdjutantData {
   journalEntries: string[];
   loading: boolean;
   error: string | null;
+  actionStates: Record<LifecycleAction, ActionState>;
   fetchStatus: () => Promise<void>;
   fetchSchedules: () => Promise<void>;
   fetchHealth: () => Promise<void>;
   handleScheduleToggle: (name: string, enabled: boolean) => Promise<void>;
   handleScheduleRun: (name: string) => Promise<void>;
-  handleLifecycleAction: (action: 'pause' | 'resume' | 'pulse' | 'review') => Promise<void>;
+  runLifecycleAction: (action: LifecycleAction) => Promise<void>;
 }
 
 /**
@@ -62,7 +66,14 @@ export function useAdjutant(): AdjutantData {
   const [journalEntries, setJournalEntries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionStates, setActionStates] = useState<Record<LifecycleAction, ActionState>>({
+    pause: 'idle',
+    resume: 'idle',
+    pulse: 'idle',
+    review: 'idle',
+  });
   const fetched = useRef(false);
+  const timeoutRefs = useRef<Record<string, number>>({});
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -160,15 +171,53 @@ export function useAdjutant(): AdjutantData {
     if (!res.ok) throw new Error('Failed to run schedule');
   }, []);
 
-  const handleLifecycleAction = useCallback(async (action: 'pause' | 'resume' | 'pulse' | 'review') => {
-    const res = await fetch('/api/adjutant/lifecycle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) throw new Error(`Failed to ${action}`);
-    await fetchStatus();
-  }, [fetchStatus]);
+  const runLifecycleAction = useCallback(async (action: LifecycleAction) => {
+    // Guard: don't run if already running
+    if (actionStates[action] === 'running') return;
+
+    // Clear any pending timeout for this action
+    if (timeoutRefs.current[action]) {
+      clearTimeout(timeoutRefs.current[action]);
+      delete timeoutRefs.current[action];
+    }
+
+    // Set running state
+    setActionStates(prev => ({ ...prev, [action]: 'running' }));
+
+    try {
+      const res = await fetch('/api/adjutant/lifecycle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error(`Failed to ${action}`);
+
+      // Refresh status after lifecycle action (e.g. pause → PAUSED)
+      await fetchStatus();
+
+      // Set success state
+      setActionStates(prev => ({ ...prev, [action]: 'success' }));
+
+      // Auto-reset to idle after 3s
+      timeoutRefs.current[action] = setTimeout(() => {
+        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
+        delete timeoutRefs.current[action];
+      }, 3000);
+    } catch (err) {
+      console.error(`Lifecycle action ${action} failed:`, err);
+
+      // Set error state
+      setActionStates(prev => ({ ...prev, [action]: 'error' }));
+
+      // Auto-reset to idle after 4s
+      timeoutRefs.current[action] = setTimeout(() => {
+        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
+        delete timeoutRefs.current[action];
+      }, 4000);
+
+      throw err;
+    }
+  }, [actionStates, fetchStatus]);
 
   return {
     status,
@@ -178,11 +227,12 @@ export function useAdjutant(): AdjutantData {
     journalEntries,
     loading,
     error,
+    actionStates,
     fetchStatus,
     fetchSchedules,
     fetchHealth,
     handleScheduleToggle,
     handleScheduleRun,
-    handleLifecycleAction,
+    runLifecycleAction,
   };
 }

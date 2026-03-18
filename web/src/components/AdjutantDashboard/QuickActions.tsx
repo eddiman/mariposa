@@ -1,45 +1,17 @@
-import { useState } from 'react';
+import type { LifecycleAction, ActionState } from '../../hooks/useAdjutant';
 import styles from './QuickActions.module.css';
-
-type Action = 'pause' | 'resume' | 'pulse' | 'review';
-type ActionState = 'idle' | 'running' | 'success' | 'error';
 
 interface QuickActionsProps {
   lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED';
-  onAction: (action: Action) => Promise<void>;
+  actionStates: Record<LifecycleAction, ActionState>;
+  onAction: (action: LifecycleAction) => Promise<void>;
 }
 
-export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
+export function QuickActions({ lifecycleState, actionStates, onAction }: QuickActionsProps) {
   const isPaused = lifecycleState === 'PAUSED';
   const isKilled = lifecycleState === 'KILLED';
 
-  const [actionStates, setActionStates] = useState<Record<Action, ActionState>>({
-    pause: 'idle',
-    resume: 'idle',
-    pulse: 'idle',
-    review: 'idle',
-  });
-
-  const handleAction = async (action: Action) => {
-    if (actionStates[action] === 'running') return;
-
-    setActionStates(prev => ({ ...prev, [action]: 'running' }));
-
-    try {
-      await onAction(action);
-      setActionStates(prev => ({ ...prev, [action]: 'success' }));
-      setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
-      }, 3000);
-    } catch {
-      setActionStates(prev => ({ ...prev, [action]: 'error' }));
-      setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [action]: 'idle' }));
-      }, 4000);
-    }
-  };
-
-  const getButtonContent = (action: Action, icon: string, label: string) => {
+  const getButtonContent = (action: LifecycleAction, icon: string, label: string) => {
     const state = actionStates[action];
 
     switch (state) {
@@ -74,7 +46,7 @@ export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
     }
   };
 
-  const getButtonClass = (action: Action, baseClass: string) => {
+  const getButtonClass = (action: LifecycleAction, baseClass: string) => {
     const state = actionStates[action];
     const classes = [styles.actionButton, baseClass];
     if (state === 'running') classes.push(styles.actionRunning);
@@ -91,7 +63,7 @@ export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
         {!isPaused && !isKilled && (
           <button
             className={getButtonClass('pause', styles.actionPause)}
-            onClick={() => handleAction('pause')}
+            onClick={() => onAction('pause')}
             disabled={actionStates.pause === 'running'}
           >
             {getButtonContent('pause', '⏸', 'Pause')}
@@ -101,7 +73,7 @@ export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
         {isPaused && (
           <button
             className={getButtonClass('resume', styles.actionResume)}
-            onClick={() => handleAction('resume')}
+            onClick={() => onAction('resume')}
             disabled={actionStates.resume === 'running'}
           >
             {getButtonContent('resume', '▶', 'Resume')}
@@ -110,7 +82,7 @@ export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
 
         <button
           className={getButtonClass('pulse', styles.actionPulse)}
-          onClick={() => handleAction('pulse')}
+          onClick={() => onAction('pulse')}
           disabled={actionStates.pulse === 'running'}
         >
           {getButtonContent('pulse', '💓', 'Pulse')}
@@ -118,7 +90,7 @@ export function QuickActions({ lifecycleState, onAction }: QuickActionsProps) {
 
         <button
           className={getButtonClass('review', styles.actionReview)}
-          onClick={() => handleAction('review')}
+          onClick={() => onAction('review')}
           disabled={actionStates.review === 'running'}
         >
           {getButtonContent('review', '📋', 'Review')}
