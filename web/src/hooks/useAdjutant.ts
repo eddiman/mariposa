@@ -72,8 +72,6 @@ export interface AdjutantData {
   runLifecycleAction: (action: LifecycleAction) => Promise<void>;
 }
 
-/** Polling interval when idle (ms). */
-const POLL_IDLE_MS = 10_000;
 /** Polling interval when an operation is active (ms). */
 const POLL_ACTIVE_MS = 3_000;
 /** How long to show the "Done" state after an operation completes (ms). */
@@ -208,19 +206,21 @@ export function useAdjutant(): AdjutantData {
     fetchAll();
   }, [fetchStatus, fetchSchedules, fetchIdentity, fetchHealth, fetchJournal]);
 
-  // Poll /status — faster when an operation is active
+  // Poll /status ONLY while an operation is active — stop once it completes.
+  // No idle polling. Initial state comes from the one-time fetch above.
   useEffect(() => {
     const isActive = !!status?.activeOperation;
-    const interval = isActive ? POLL_ACTIVE_MS : POLL_IDLE_MS;
 
-    // Clear previous interval
     if (pollRef.current !== null) {
       clearInterval(pollRef.current);
+      pollRef.current = null;
     }
 
-    pollRef.current = window.setInterval(() => {
-      fetchStatus();
-    }, interval);
+    if (isActive) {
+      pollRef.current = window.setInterval(() => {
+        fetchStatus();
+      }, POLL_ACTIVE_MS);
+    }
 
     return () => {
       if (pollRef.current !== null) {
@@ -274,9 +274,14 @@ export function useAdjutant(): AdjutantData {
       });
       if (!res.ok) throw new Error(`Failed to ${action}`);
 
-      // For pause/resume: refresh status immediately (they're synchronous)
-      // For pulse/review: poll will pick up the active_operation marker
+      // For pause/resume: refresh status immediately (they're synchronous).
+      // For pulse/review: the detached process may not have written the
+      // active_operation marker yet, so fetch once now and again after a
+      // short delay.  The second fetch triggers the polling effect.
       await fetchStatus();
+      if (action === 'pulse' || action === 'review') {
+        window.setTimeout(() => { fetchStatus(); }, 1500);
+      }
     } catch (err) {
       console.error(`Lifecycle action ${action} failed:`, err);
       setTriggerErrors(prev => ({ ...prev, [action]: true }));
