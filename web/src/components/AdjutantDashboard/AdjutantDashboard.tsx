@@ -163,22 +163,16 @@ export function AdjutantDashboard({ sidebarOpen = false }: AdjutantDashboardProp
   };
 
   const handleLifecycleAction = async (action: 'pause' | 'resume' | 'pulse' | 'review') => {
-    try {
-      const res = await fetch('/api/adjutant/lifecycle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      
-      if (!res.ok) throw new Error(`Failed to ${action}`);
-      
-      // Refresh status after lifecycle action
-      await fetchStatus();
-      alert(`${action.charAt(0).toUpperCase() + action.slice(1)} completed`);
-    } catch (err) {
-      console.error(`Failed to ${action}:`, err);
-      alert(`Failed to ${action}`);
-    }
+    const res = await fetch('/api/adjutant/lifecycle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    
+    if (!res.ok) throw new Error(`Failed to ${action}`);
+    
+    // Refresh status after lifecycle action (e.g. pause → PAUSED)
+    await fetchStatus();
   };
 
   const dashboardClass = `${styles.dashboard} ${sidebarOpen ? styles.sidebarOpen : ''}`;

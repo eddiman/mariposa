@@ -44,20 +44,26 @@
   border-radius: 0;
 }
 
-.actionButton:hover {
+.actionButton:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--color-primary);
 }
 
-[data-theme="bauhaus"] .actionButton:hover {
+[data-theme="bauhaus"] .actionButton:hover:not(:disabled) {
   transform: none;
   box-shadow: none;
+}
+
+.actionButton:disabled {
+  cursor: default;
+  opacity: 1; /* Don't dim — we show our own state */
 }
 
 .actionIcon {
   font-size: var(--font-size-3xl);
   margin-bottom: var(--spacing-2);
+  transition: all var(--transition-fast);
 }
 
 .actionLabel {
@@ -66,24 +72,91 @@
   color: var(--color-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  transition: color var(--transition-fast);
 }
 
-.actionPause:hover {
-  border-color: var(--color-warning, #f59e0b);
-  background: var(--color-warning-background, rgba(245, 158, 11, 0.05));
-}
+/* === Running state === */
 
-.actionResume:hover {
-  border-color: var(--color-success, #10b981);
-  background: var(--color-success-background, rgba(16, 185, 129, 0.05));
-}
-
-.actionPulse:hover {
+.actionRunning {
   border-color: var(--color-primary);
   background: var(--color-primary-background, rgba(0, 102, 204, 0.05));
 }
 
-.actionReview:hover {
+.actionRunning:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+  color: var(--color-primary);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === Success state === */
+
+.actionSuccess {
+  border-color: var(--color-success, #10b981);
+  background: var(--color-success-background, rgba(16, 185, 129, 0.08));
+}
+
+.actionSuccess:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.successIcon {
+  color: var(--color-success, #10b981);
+  font-size: var(--font-size-3xl);
+}
+
+.successLabel {
+  color: var(--color-success, #10b981);
+}
+
+/* === Error state === */
+
+.actionError {
+  border-color: var(--color-error, #ef4444);
+  background: var(--color-error-background, rgba(239, 68, 68, 0.08));
+}
+
+.actionError:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.errorIcon {
+  color: var(--color-error, #ef4444);
+  font-size: var(--font-size-3xl);
+}
+
+.errorLabel {
+  color: var(--color-error, #ef4444);
+}
+
+/* === Hover colors per action === */
+
+.actionPause:hover:not(:disabled):not(.actionRunning):not(.actionSuccess):not(.actionError) {
+  border-color: var(--color-warning, #f59e0b);
+  background: var(--color-warning-background, rgba(245, 158, 11, 0.05));
+}
+
+.actionResume:hover:not(:disabled):not(.actionRunning):not(.actionSuccess):not(.actionError) {
+  border-color: var(--color-success, #10b981);
+  background: var(--color-success-background, rgba(16, 185, 129, 0.05));
+}
+
+.actionPulse:hover:not(:disabled):not(.actionRunning):not(.actionSuccess):not(.actionError) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-background, rgba(0, 102, 204, 0.05));
+}
+
+.actionReview:hover:not(:disabled):not(.actionRunning):not(.actionSuccess):not(.actionError) {
   border-color: var(--color-secondary, #8b5cf6);
   background: var(--color-secondary-background, rgba(139, 92, 246, 0.05));
 }
