@@ -44,16 +44,24 @@ Extended `/api/adjutant` routes with new endpoints:
 
 #### Health & Lifecycle
 - **`GET /api/adjutant/health`** — Run health checks
-  - Checks: Adjutant directory exists, config exists, CLI executable
+  - Checks: Adjutant directory exists, config exists, CLI executable, process running
+  - Process check reads PID files and verifies PID alive via `kill(pid, 0)`
   - Returns overall health status + individual check results
+  - All four checks must pass for `healthy: true`
 - **`POST /api/adjutant/lifecycle`** — Control Adjutant lifecycle
   - Body: `{ action: 'pause' | 'resume' | 'pulse' | 'review' }`
   - Calls corresponding `adjutant <action>` command
   - Returns command output
 
 #### Existing Status Endpoint (Extended)
-- **`GET /api/adjutant/status`** — Already existed from Phase 2
+- **`GET /api/adjutant/status`** — Already existed from Phase 2, extended with process detection
   - Returns mode (adjutant/standalone), lifecycle state, Adjutant directory
+  - Now includes `processRunning` (boolean) and `listenerPid` (number, if alive)
+  - Lifecycle state detection: checks `KILLED`/`PAUSED` marker files + listener PID liveness
+  - New `STOPPED` state: no marker files present and listener process is not alive
+  - Process detection uses same priority as Adjutant's `service.py`:
+    1. `state/listener.lock/pid` (authoritative — written by listener itself)
+    2. `state/telegram.pid` (written by launcher)
 
 ### Frontend (Web)
 
@@ -85,9 +93,11 @@ web/src/components/AdjutantDashboard/
 **System Status Card:**
 - Shows current mode (Adjutant vs Standalone)
 - Displays lifecycle state with colored indicator:
-  - OPERATIONAL (green)
-  - PAUSED (yellow)
-  - KILLED (red)
+  - OPERATIONAL (green) — no marker files, listener process alive
+  - PAUSED (yellow) — PAUSED marker file present
+  - KILLED (red) — KILLED marker file present
+  - STOPPED (gray) — no marker files, listener process not alive
+- Shows process status (running with PID or not running)
 - Shows Adjutant directory path
 
 **Schedules Manager (Full Width):**
@@ -103,10 +113,10 @@ web/src/components/AdjutantDashboard/
 - Shows count in header
 
 **Quick Actions Card:**
-- Pause button (visible when OPERATIONAL)
+- Pause button (visible when OPERATIONAL — hidden when PAUSED, KILLED, or STOPPED)
 - Resume button (visible when PAUSED)
-- Pulse button (always visible)
-- Review button (always visible)
+- Pulse button (always visible — standalone CLI operation, works without listener)
+- Review button (always visible — standalone CLI operation, works without listener)
 - Color-coded hover states
 - Emoji icons for visual clarity
 
@@ -116,6 +126,8 @@ web/src/components/AdjutantDashboard/
   - Adjutant Directory exists
   - Config file exists
   - CLI executable
+  - Process running (listener PID alive)
+- All four checks must pass for overall "healthy" status
 - Refresh button (rotates on hover)
 
 **Identity Display (Full Width):**

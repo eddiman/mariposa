@@ -2,7 +2,7 @@ import type { LifecycleAction, ActionState } from '../../hooks/useAdjutant';
 import styles from './QuickActions.module.css';
 
 interface QuickActionsProps {
-  lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED';
+  lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED' | 'STOPPED';
   actionStates: Record<LifecycleAction, ActionState>;
   onAction: (action: LifecycleAction) => Promise<void>;
 }
@@ -10,6 +10,7 @@ interface QuickActionsProps {
 export function QuickActions({ lifecycleState, actionStates, onAction }: QuickActionsProps) {
   const isPaused = lifecycleState === 'PAUSED';
   const isKilled = lifecycleState === 'KILLED';
+  const isStopped = lifecycleState === 'STOPPED';
 
   const getButtonContent = (action: LifecycleAction, icon: string, label: string) => {
     const state = actionStates[action];
@@ -60,7 +61,7 @@ export function QuickActions({ lifecycleState, actionStates, onAction }: QuickAc
       <h2 className={styles.cardTitle}>Quick Actions</h2>
 
       <div className={styles.actionsGrid}>
-        {!isPaused && !isKilled && (
+        {!isPaused && !isKilled && !isStopped && (
           <button
             className={getButtonClass('pause', styles.actionPause)}
             onClick={() => onAction('pause')}

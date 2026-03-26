@@ -5,7 +5,9 @@ interface SystemStatusProps {
     mode: 'adjutant' | 'standalone';
     available: boolean;
     adjutantDir?: string;
-    lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED';
+    lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED' | 'STOPPED';
+    processRunning?: boolean;
+    listenerPid?: number;
   };
 }
 
@@ -18,6 +20,8 @@ export function SystemStatus({ status }: SystemStatusProps) {
         return styles.statePaused;
       case 'KILLED':
         return styles.stateKilled;
+      case 'STOPPED':
+        return styles.stateStopped;
       default:
         return '';
     }
@@ -37,6 +41,13 @@ export function SystemStatus({ status }: SystemStatusProps) {
           <span className={styles.label}>State</span>
           <span className={`${styles.value} ${getStateColor(status.lifecycleState)}`}>
             {status.lifecycleState || 'UNKNOWN'}
+          </span>
+        </div>
+
+        <div className={styles.statusItem}>
+          <span className={styles.label}>Process</span>
+          <span className={`${styles.value} ${status.processRunning ? styles.stateOperational : styles.stateStopped}`}>
+            {status.processRunning ? `Running (PID ${status.listenerPid})` : 'Not running'}
           </span>
         </div>
 

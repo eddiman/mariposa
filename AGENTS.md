@@ -274,6 +274,7 @@ Note opening: Double-click a note on the canvas opens the editor overlay. Option
 | `useCanvasContextMenu` | Build context menu items for canvas and nodes |
 | `useCanvasKeyboard` | Keyboard shortcuts (Cmd+Z, Cmd+C, Delete, Escape, S, T, Enter) |
 | `useCanvasTouchGestures` | Long-press (500ms) and two-finger tap for context menus |
+| `useAdjutant` | Adjutant dashboard data: status (with process liveness), schedules, identity, health, journal. Polls /status every 10s (3s when operation active). |
 
 ### Contexts
 
@@ -325,6 +326,19 @@ Note opening: Double-click a note on the canvas opens the editor overlay. Option
 | GET | `/api/assets/:filename?kb=` | Serve image file (1-year cache) |
 | POST | `/api/assets/upload` | Upload image (multipart, 10MB, body includes `kb`) |
 | DELETE | `/api/assets/:id?kb=` | Delete image + all variants |
+
+### Adjutant (`/api/adjutant`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/adjutant/status` | System status: mode, lifecycle state (`OPERATIONAL`/`PAUSED`/`KILLED`/`STOPPED`), `processRunning`, `listenerPid` |
+| GET | `/api/adjutant/health` | Health checks: dir exists, config exists, CLI executable, process running |
+| POST | `/api/adjutant/lifecycle` | Lifecycle control: `{ action: 'pause' \| 'resume' \| 'pulse' \| 'review' }` |
+| GET | `/api/adjutant/schedules` | List scheduled jobs from `adjutant.yaml` |
+| POST | `/api/adjutant/schedules/toggle` | Enable/disable a schedule: `{ name, enabled }` |
+| POST | `/api/adjutant/schedules/run` | Trigger a schedule: `{ name }` |
+| GET | `/api/adjutant/identity` | Get excerpts from soul.md, heart.md, registry.md |
+| GET | `/api/adjutant/journal/recent` | Get last 20 journal entries |
+| POST | `/api/adjutant/kb/query` | Query a KB via sub-agent: `{ kb, question }` |
 
 ### Health
 | Method | Path | Description |
@@ -541,3 +555,8 @@ cd api && npm run test:watch  # Watch mode
 - Vite proxy has `timeout: 0` for `/api/config/browse` (Finder dialog needs unlimited time)
 - Vite build splits `@xyflow/react` and TipTap into separate chunks
 - `createApp()` is exported from `index.ts` for test use; server only starts when run directly
+- Adjutant lifecycle state derives from filesystem markers + process liveness:
+  - `KILLED` file present → KILLED; `PAUSED` file present → PAUSED
+  - No markers + listener PID alive → OPERATIONAL; No markers + PID dead → STOPPED
+- Process detection reads `state/listener.lock/pid` then `state/telegram.pid`, verifies PID alive via `kill(pid, 0)`
+- Health check requires all four checks green: dir exists, config exists, CLI executable, process running

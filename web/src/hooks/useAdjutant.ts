@@ -24,7 +24,9 @@ export interface AdjutantStatus {
   mode: 'adjutant' | 'standalone';
   available: boolean;
   adjutantDir?: string;
-  lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED';
+  lifecycleState?: 'OPERATIONAL' | 'PAUSED' | 'KILLED' | 'STOPPED';
+  processRunning?: boolean;
+  listenerPid?: number;
   activeOperation?: ActiveOperation | null;
   lastHeartbeat?: LastHeartbeat | null;
 }
@@ -52,6 +54,7 @@ export interface HealthStatus {
     adjutantDirExists: boolean;
     configExists: boolean;
     cliExecutable: boolean;
+    processRunning: boolean;
   };
 }
 

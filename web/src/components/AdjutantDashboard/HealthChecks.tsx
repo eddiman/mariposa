@@ -7,6 +7,7 @@ interface HealthChecksProps {
       adjutantDirExists: boolean;
       configExists: boolean;
       cliExecutable: boolean;
+      processRunning: boolean;
     };
   } | null;
   onRefresh: () => Promise<void>;
@@ -26,6 +27,7 @@ export function HealthChecks({ health, onRefresh }: HealthChecksProps) {
     { label: 'Adjutant Directory', status: health.checks.adjutantDirExists },
     { label: 'Config File', status: health.checks.configExists },
     { label: 'CLI Executable', status: health.checks.cliExecutable },
+    { label: 'Process Running', status: health.checks.processRunning },
   ];
 
   return (

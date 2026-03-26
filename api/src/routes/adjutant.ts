@@ -14,6 +14,62 @@ import { kbService } from '../services/kbService.js';
 
 const router = Router();
 
+// === Process Detection Helpers ===
+
+/**
+ * Check if a PID is alive (equivalent to `kill -0` / Adjutant's pid_is_alive).
+ *
+ * Returns true if the process exists. EPERM means it exists but we can't
+ * signal it — still alive.
+ */
+function pidIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EPERM') {
+      return true; // Process exists, we just can't signal it
+    }
+    return false; // ESRCH = no such process
+  }
+}
+
+/**
+ * Read a PID file and return the PID if the process is alive.
+ * Returns null if the file doesn't exist, is unreadable, or the PID is dead.
+ */
+async function readAlivePid(filePath: string): Promise<number | null> {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const pid = parseInt(content.trim(), 10);
+    if (isNaN(pid)) return null;
+    return pidIsAlive(pid) ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find the running Adjutant listener PID using the same priority as
+ * Adjutant's own service.py:_find_listener_pid:
+ *
+ *   1. state/listener.lock/pid — written by the listener itself
+ *   2. state/telegram.pid — written by the launcher
+ *
+ * (Skips psutil/process-scan — not available in Node; PID files are sufficient.)
+ */
+async function findListenerPid(adjDir: string): Promise<number | null> {
+  // Priority 1: listener.lock/pid (authoritative — written by the listener)
+  const lockPid = await readAlivePid(path.join(adjDir, 'state', 'listener.lock', 'pid'));
+  if (lockPid !== null) return lockPid;
+
+  // Priority 2: telegram.pid (written by the launcher)
+  const telegramPid = await readAlivePid(path.join(adjDir, 'state', 'telegram.pid'));
+  if (telegramPid !== null) return telegramPid;
+
+  return null;
+}
+
 /**
  * GET /api/adjutant/status — Adjutant integration status.
  *
@@ -21,7 +77,9 @@ const router = Router();
  * - mode: 'adjutant' | 'standalone'
  * - available: whether Adjutant directory was found
  * - adjutantDir: path to Adjutant directory (if available)
- * - lifecycleState: OPERATIONAL | PAUSED | KILLED (read from state files)
+ * - lifecycleState: OPERATIONAL | PAUSED | KILLED | STOPPED (read from state files + process check)
+ * - processRunning: whether the listener process is alive
+ * - listenerPid: PID of the running listener (if alive)
  */
 router.get('/status', async (_req: Request, res: Response) => {
   try {
@@ -36,7 +94,13 @@ router.get('/status', async (_req: Request, res: Response) => {
     if (adjDir) {
       result.adjutantDir = adjDir;
 
-      // Read lifecycle state from filesystem markers
+      // Read lifecycle state from filesystem markers + process check
+      const listenerPid = await findListenerPid(adjDir);
+      result.processRunning = listenerPid !== null;
+      if (listenerPid !== null) {
+        result.listenerPid = listenerPid;
+      }
+
       try {
         await fs.access(path.join(adjDir, 'KILLED'));
         result.lifecycleState = 'KILLED';
@@ -45,7 +109,7 @@ router.get('/status', async (_req: Request, res: Response) => {
           await fs.access(path.join(adjDir, 'PAUSED'));
           result.lifecycleState = 'PAUSED';
         } catch {
-          result.lifecycleState = 'OPERATIONAL';
+          result.lifecycleState = listenerPid !== null ? 'OPERATIONAL' : 'STOPPED';
         }
       }
 
@@ -418,6 +482,7 @@ router.get('/journal/recent', async (_req: Request, res: Response) => {
  * - Adjutant directory exists
  * - Config file exists
  * - CLI is executable
+ * - Listener process is running (PID alive)
  */
 router.get('/health', async (_req: Request, res: Response) => {
   try {
@@ -427,6 +492,7 @@ router.get('/health', async (_req: Request, res: Response) => {
       adjutantDirExists: adjDir !== null,
       configExists: false,
       cliExecutable: false,
+      processRunning: false,
     };
 
     if (adjDir) {
@@ -443,9 +509,13 @@ router.get('/health', async (_req: Request, res: Response) => {
       } catch {
         // CLI not executable
       }
+
+      const listenerPid = await findListenerPid(adjDir);
+      checks.processRunning = listenerPid !== null;
     }
 
-    const healthy = checks.adjutantDirExists && checks.configExists && checks.cliExecutable;
+    const healthy = checks.adjutantDirExists && checks.configExists
+      && checks.cliExecutable && checks.processRunning;
 
     res.json({
       healthy,
